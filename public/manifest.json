@@ -1,7 +1,7 @@
 {
-  "name": "lifeGLANCE",
-  "short_name": "lifeGLANCE",
-  "description": "Your life, at a glance. A zoomable timeline for life's milestones — past and future.",
+  "name": "时光墙",
+  "short_name": "时光墙",
+  "description": "你的人生，一眼看尽。可缩放的个人时间线，记录过去与未来的里程碑。",
   "start_url": "/",
   "display": "fullscreen",
   "background_color": "#0f1117",

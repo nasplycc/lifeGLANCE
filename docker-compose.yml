@@ -1,6 +1,25 @@
 services:
   lifeglance:
-    image: ghcr.io/krelltunez/lifeglance:latest
+    build: .
     ports:
       - "6868:80"
+    depends_on:
+      - backend
     restart: unless-stopped
+
+  backend:
+    build: ./server
+    environment:
+      - PORT=3001
+      - DB_PATH=/data/timora.db
+      - SMTP_HOST=smtp.qq.com
+      - SMTP_PORT=465
+      - SMTP_USER=592642131@qq.com
+      - SMTP_PASS=gyxcrzpmqgftbejh
+      - SMTP_FROM=592642131@qq.com
+    volumes:
+      - timora-data:/data
+    restart: unless-stopped
+
+volumes:
+  timora-data:

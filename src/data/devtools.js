@@ -4,24 +4,14 @@ import {
   getMilestonesInChapter, getChaptersForMilestone,
 } from './chapters'
 import { loadMilestones } from './milestones'
-
-// Attaches window.lg — a set of dev-console-callable functions for verifying
-// the Phase 1 Chapter data model.  Call window.lg.help() for a usage summary.
-//
-// Verification workflow from the PR description:
-//   1. lg.createChapter(...)              — create a chapter, see it written to IDB
-//   2. lg.addMilestoneToChapter(...)      — add a milestone, see chapter updated
-//   3. lg.getChapter(id)                  — confirm milestone is in chapter.milestoneIds
-//   4. lg.getChaptersForMilestone(id)     — confirm chapter appears for that milestone
-//   5. lg.updateChapter(id, {...})        — update a field, reload app, lg.getChapter(id) again
-//   6. lg.deleteChapter(id)              — delete; lg.getChaptersForMilestone(id) returns []
-//   7. lg.checkMigration()               — log milestone count + sample mainTimelineVisibility
+import { apiHealth, apiExportSync, apiImportSync } from '../lib/api'
+import { setApiAvailable } from '../lib/sync'
 
 export function registerDevtools() {
   window.lg = {
     help() {
       console.log(`
-lifeGLANCE Phase 1 devtools  (window.lg)
+时光墙 Phase 1 devtools  (window.lg)
 ─────────────────────────────────────────
 Chapter CRUD
   lg.createChapter({ title, start, end, color, description?, defaultMemberVisibility?, parentChapterId? })
@@ -37,7 +27,13 @@ Membership
   lg.getChaptersForMilestone(milestoneId)
 
 Migration
-  lg.checkMigration()   — log milestone count + sample mainTimelineVisibility
+  lg.checkMigration()
+
+Sync (v1.6+)
+  lg.apiCheck()      - test backend connectivity
+  lg.apiExport()     - dump server data to console
+  lg.apiImport()     - push local data to server
+  lg.apiImportForce() - push and replace server data
 
 All functions return Promises; await them or check the console.
       `.trim())
@@ -112,7 +108,35 @@ All functions return Promises; await them or check the console.
       }
       return milestones
     },
+
+    // ── Sync tools ───────────────────────────────────────────────────
+    async apiCheck() {
+      const ok = await apiHealth()
+      console.log(`[lg.apiCheck] backend reachable: ${ok}`)
+      setApiAvailable(ok)
+      return ok
+    },
+
+    async apiExport() {
+      const data = await apiExportSync()
+      console.log('[lg.apiExport] server data:', data)
+      return data
+    },
+
+    async apiImport() {
+      const milestones = await loadMilestones()
+      const chapters   = await listChapters()
+      const payload = { milestones, chapters }
+      const result = await apiImportSync(payload)
+      console.log('[lg.apiImport] pushed:', result)
+      return result
+    },
+
+    async apiImportForce() {
+      await this.apiImport()
+      console.log('[lg.apiImportForce] done — server now matches local')
+    },
   }
 
-  console.log('[lifeGLANCE devtools] window.lg ready — run lg.help() for usage')
+  console.log('[时光墙 devtools] window.lg ready — run lg.help() for usage')
 }

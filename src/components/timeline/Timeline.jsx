@@ -4,7 +4,9 @@ import React, {
 } from 'react'
 import { dateToX, getTimeRangeForView, getTickMarks, assignLanes, getMsPerPx } from '../../utils/timeline'
 import { relativeLabel, formatDateDisplay, ageAtDate } from '../../utils/dates'
-import { dbGetMedia } from '../../data/db'
+import { dbGetMedia, dbGetPhoto } from '../../data/db'
+import { apiMediaUrl } from '../../lib/api'
+import { isApiAvailable } from '../../lib/sync'
 
 // Map text-size labels → root px value (must match TimelineView TEXT_SIZES)
 const REM_PX = { small: 19, normal: 22, big: 26, bigger: 30 }
@@ -29,7 +31,7 @@ function assignChapterRows(chapters) {
 
 // Human-readable duration string, e.g. "4y 2mo" or "8mo". Returns "ongoing" for open-ended chapters.
 function chapterSpan(startIso, endIso) {
-  if (!endIso) return 'ongoing'
+  if (!endIso) return '进行中'
   const s = new Date(startIso), e = new Date(endIso)
   const totalMonths = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth())
   const yrs = Math.floor(totalMonths / 12)
@@ -41,7 +43,7 @@ function chapterSpan(startIso, endIso) {
 }
 
 // Word-wrap title to at most 2 lines given a max-chars-per-line limit.
-// Courier Prime is monospace so char-count is a reliable width proxy.
+// Open Sans is proportional so we estimate width differently.
 function wrapTitle(text, maxChars) {
   if (text.length <= maxChars) return [text]
   const words = text.split(' ')
@@ -95,6 +97,7 @@ const Timeline = forwardRef(function Timeline(
   const audioElRef = useRef(null)
   // Track which IDs have already played their fly-in so we don't re-animate on re-renders
   const [flyDoneIds,  setFlyDoneIds]  = useState(() => new Set())
+  const [photoThumbs, setPhotoThumbs] = useState({}) // { [milestoneId]: objectUrl }
   // panMsRef always tracks the latest value for animation calculations
   const panMsRef        = useRef(panMs)
   const animRef         = useRef(null)
@@ -112,6 +115,68 @@ const Timeline = forwardRef(function Timeline(
 
   // Keep ref in sync when panMs changes from parent (e.g. minimap direct scrub)
   useEffect(() => { panMsRef.current = panMs }, [panMs])
+
+  // Load photo thumbnails for milestones with has_photo
+  const loadedPhotoIds = useRef(new Set())
+  const loadCountRef   = useRef(0)
+
+  const loadPhotoThumbs = useCallback(() => {
+    // Always reload on mount — blob URLs are session-only and die on refresh
+    const toLoad = milestones.filter(m => m.has_photo)
+    if (toLoad.length === 0) return
+    console.log(`[photos] loadPhotoThumbs: ${toLoad.length} to load, milestones=${milestones.length}`)
+
+    const thisBatch = ++loadCountRef.current
+    Promise.all(toLoad.map(async m => {
+      // Skip if already loaded in this session
+      if (loadedPhotoIds.current.has(m.id)) return null
+      loadedPhotoIds.current.add(m.id)
+
+      try {
+        const result = await dbGetPhoto(m.id)
+        if (result) {
+          console.log(`[photos] ${m.id}: IDB hit, blob=${result.blob.size}b`)
+          return [m.id, URL.createObjectURL(result.blob)]
+        } else {
+          console.log(`[photos] ${m.id}: IDB miss (result=${!!result})`)
+        }
+      } catch (e) {
+        console.warn(`[photos] ${m.id}: IDB error`, e)
+      }
+      // Fallback: use server URL directly (with auth token)
+      if (isApiAvailable()) {
+        const url = apiMediaUrl(m.id, 'photo')
+        console.log(`[photos] ${m.id}: fallback to server URL: ${url}`)
+        return [m.id, url]
+      }
+      return null
+    })).then(entries => {
+      if (thisBatch !== loadCountRef.current) return // stale batch
+      const newThumbs = {}
+      entries.forEach(e => { if (e) newThumbs[e[0]] = e[1] })
+      if (Object.keys(newThumbs).length > 0) {
+        console.log(`[photos] loadPhotoThumbs: loaded ${Object.keys(newThumbs).length} thumbs`)
+        setPhotoThumbs(prev => ({ ...prev, ...newThumbs }))
+      }
+    })
+  }, [milestones])
+
+  useEffect(() => { loadPhotoThumbs() }, [milestones])
+
+  // Re-load photos after server sync completes
+  useEffect(() => {
+    const onPhotosSynced = () => {
+      loadedPhotoIds.current.clear()
+      loadPhotoThumbs()
+    }
+    window.addEventListener('photos-synced', onPhotosSynced)
+    return () => window.removeEventListener('photos-synced', onPhotosSynced)
+  }, [loadPhotoThumbs])
+
+  // Cleanup object URLs on unmount
+  useEffect(() => {
+    return () => { Object.values(photoThumbs).forEach(url => URL.revokeObjectURL(url)) }
+  }, [])
 
   // Shared smooth-pan helper
   const smoothPanTo = useCallback((targetPan) => {
@@ -318,7 +383,7 @@ const Timeline = forwardRef(function Timeline(
                 textAnchor="middle"
                 fill={tick.major ? 'rgba(232,224,208,0.35)' : 'rgba(232,224,208,0.18)'}
                 fontSize={tick.major ? '0.69em' : '0.56em'}
-                fontFamily="'Courier Prime', monospace"
+                fontFamily="'Open Sans', sans-serif"
               >{tick.label}</text>
             )}
           </g>
@@ -389,7 +454,7 @@ const Timeline = forwardRef(function Timeline(
               const visX2  = showFade ? Math.max(solidX2, fadeX2) : solidX2
               const visW   = visX2 - solidX1
 
-              // Label truncation: Courier Prime is monospace.
+              // Label truncation.
               // At 0.45em, char width ≈ remPx * 0.45 * 0.60 px
               const labelFontPx  = remPx * 0.45
               const labelCharW   = labelFontPx * 0.60
@@ -452,7 +517,7 @@ const Timeline = forwardRef(function Timeline(
                       y={barY + Math.round(barH * 0.73)}
                       fill={chapter.color}
                       fontSize="0.45em"
-                      fontFamily="'Courier Prime', monospace"
+                      fontFamily="'Open Sans', sans-serif"
                       opacity={0.9}
                     >{labelText}</text>
                   )}
@@ -464,7 +529,7 @@ const Timeline = forwardRef(function Timeline(
                       y={barY + barH - 2}
                       fill={chapter.color}
                       fontSize="0.38em"
-                      fontFamily="'Courier Prime', monospace"
+                      fontFamily="'Open Sans', sans-serif"
                       opacity={0.60}
                     >{startYear}</text>
                   )}
@@ -475,7 +540,7 @@ const Timeline = forwardRef(function Timeline(
                       textAnchor="end"
                       fill={chapter.color}
                       fontSize="0.38em"
-                      fontFamily="'Courier Prime', monospace"
+                      fontFamily="'Open Sans', sans-serif"
                       opacity={0.60}
                     >{endYear}</text>
                   )}
@@ -487,8 +552,8 @@ const Timeline = forwardRef(function Timeline(
 
         {/* ── Today marker ────────────────────────────────────────────────── */}
         {todayX > -10 && todayX < w + 10 && (() => {
-          const tDay     = today.toLocaleDateString('en-US', { weekday: 'long'  }).toLowerCase()
-          const tDate    = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }).toLowerCase()
+          const tDay     = today.toLocaleDateString('zh-CN', { weekday: 'long'  })
+          const tDate    = today.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' })
           const tYear    = today.getFullYear()
           const centered = Math.abs(panMs) < 1
           const todayLocalDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -502,27 +567,22 @@ const Timeline = forwardRef(function Timeline(
               <line x1={todayX} y1={lineY1} x2={todayX} y2={h - 14}
                 stroke="#C8A96E" strokeWidth={centered ? 2 : 1.5} strokeDasharray="4 4"
                 opacity={centered ? 1 : 0.75} />
-              <text x={todayX} y={10} textAnchor="middle"
+              <text x={todayX} y={12} textAnchor="middle"
+                fill="#C8A96E" fontSize="0.70em"
+                opacity={centered ? 1 : 0.90}>今天</text>
+              <text x={todayX} y={28} textAnchor="middle"
                 fill="#C8A96E" fontSize="0.65em"
-                fontFamily="'Courier Prime', monospace"
-                opacity={centered ? 1 : 0.90}>today</text>
-              <text x={todayX} y={22} textAnchor="middle"
-                fill="#C8A96E" fontSize="0.60em"
-                fontFamily="'Courier Prime', monospace"
                 opacity={centered ? 1 : 0.70}>{tDay}</text>
-              <text x={todayX} y={34} textAnchor="middle"
-                fill="#C8A96E" fontSize="0.60em"
-                fontFamily="'Courier Prime', monospace"
+              <text x={todayX} y={44} textAnchor="middle"
+                fill="#C8A96E" fontSize="0.65em"
                 opacity={centered ? 1 : 0.70}>{tDate}</text>
-              <text x={todayX} y={47} textAnchor="middle"
-                fill="#C8A96E" fontSize="0.65em" fontWeight="bold"
-                fontFamily="'Courier Prime', monospace"
+              <text x={todayX} y={62} textAnchor="middle"
+                fill="#C8A96E" fontSize="0.75em" fontWeight="bold"
                 opacity={centered ? 1 : 0.85}>{tYear}</text>
               {todayAge !== null && (
-                <text x={todayX} y={61} textAnchor="middle"
-                  fill="#C8A96E" fontSize="0.60em"
-                  fontFamily="'Courier Prime', monospace"
-                  opacity={centered ? 0.80 : 0.55}>{todayAge} y.o.</text>
+                <text x={todayX} y={80} textAnchor="middle"
+                  fill="#C8A96E" fontSize="0.65em"
+                  opacity={centered ? 0.80 : 0.55}>{todayAge} 岁</text>
               )}
             </g>
           )
@@ -643,18 +703,18 @@ const Timeline = forwardRef(function Timeline(
                 <text key={li}
                   x={cardX + 10} y={li === 0 ? yT1 : yT2}
                   fill="rgba(232,224,208,0.95)"
-                  fontSize="0.6em" fontFamily="'Courier Prime', monospace" fontWeight="bold"
+                  fontSize="0.6em" fontFamily="'Open Sans', sans-serif" fontWeight="bold"
                 >{line}</text>
               ))}
 
               <text x={cardX + 10} y={yMeta}
                 fill="rgba(232,224,208,0.45)"
-                fontSize="0.52em" fontFamily="'Courier Prime', monospace"
+                fontSize="0.52em" fontFamily="'Open Sans', sans-serif"
               >{dateStr}</text>
 
               <text x={cardX + 10} y={yRel}
                 fill="#C8A96E"
-                fontSize="0.52em" fontFamily="'Courier Prime', monospace"
+                fontSize="0.52em" fontFamily="'Open Sans', sans-serif"
               >{relStr}</text>
 
               {birthday && (() => {
@@ -662,15 +722,35 @@ const Timeline = forwardRef(function Timeline(
                 return age !== null ? (
                   <text x={cardX + 10} y={yAge}
                     fill="rgba(200,169,110,0.52)"
-                    fontSize="0.52em" fontFamily="'Courier Prime', monospace"
-                  >{age} y.o.</text>
+                    fontSize="0.52em" fontFamily="'Open Sans', sans-serif"
+                   >{age} 岁</text>
                 ) : null
+              })()}
+
+              {/* Photo thumbnail — bottom-right of card */}
+              {(() => {
+                const thumbUrl = photoThumbs[m.id]
+                const serverUrl = m.has_photo && !thumbUrl ? apiMediaUrl(m.id, 'photo') : null
+                const imgUrl = thumbUrl || serverUrl
+                if (!imgUrl) return null
+                return (
+                  <image
+                    href={imgUrl}
+                    x={cardX + CARD_W - 50}
+                    y={cardY + cardH - 38}
+                    width={40}
+                    height={30}
+                    preserveAspectRatio="xMidYMid slice"
+                    opacity={isHL ? 1 : 0.75}
+                    style={{ borderRadius: '3px', pointerEvents: 'none' }}
+                  />
+                )
               })()}
 
               {/* Card icons — top-right corner: camera, audio, link, recurrence (right → left) */}
               {(() => {
                 const icons = []
-                if (m.photo_uri)  icons.push('camera')
+                if (photoThumbs[m.id] || m.has_photo)  icons.push('camera')
                 if (m.media_type === 'audio') icons.push('audio')
                 if (m.media_type === 'video') icons.push('video')
                 if (m.url)        icons.push('link')
@@ -682,7 +762,7 @@ const Timeline = forwardRef(function Timeline(
                   if (type === 'camera') return (
                     <g key="camera" transform={`translate(${ix},${iy})`}
                        opacity={op} style={{ cursor: 'zoom-in' }}
-                       onMouseEnter={e => setPhotoTip({ uri: m.photo_uri, x: e.clientX, y: e.clientY })}
+                       onMouseEnter={e => setPhotoTip({ uri: photoThumbs[m.id] || apiMediaUrl(m.id, 'photo'), x: e.clientX, y: e.clientY })}
                        onMouseLeave={() => setPhotoTip(null)}>
                       <rect x={-2} y={-1} width={18} height={13} fill="transparent" />
                       <rect x={0} y={2.5} width={14} height={8} rx={1.3}
@@ -806,7 +886,7 @@ const Timeline = forwardRef(function Timeline(
               <text x={avgX} y={badgeCy + 4}
                 textAnchor="middle"
                 fill="rgba(200,169,110,0.9)"
-                fontSize="0.58em" fontFamily="'Courier Prime', monospace" fontWeight="bold"
+                fontSize="0.58em" fontFamily="'Open Sans', sans-serif" fontWeight="bold"
               >{count}</text>
               {/* Category colour dots above badge */}
               {colors.map((color, ci) => {
@@ -820,7 +900,7 @@ const Timeline = forwardRef(function Timeline(
               <text x={avgX} y={badgeCy - R - 17}
                 textAnchor="middle"
                 fill="rgba(232,224,208,0.55)"
-                fontSize="0.5em" fontFamily="'Courier Prime', monospace"
+                fontSize="0.5em" fontFamily="'Open Sans', sans-serif"
               >{rangeLabel}</text>
             </g>
           )
@@ -864,14 +944,17 @@ const Timeline = forwardRef(function Timeline(
           border:        `1px solid ${chapterTip.chapter.color}55`,
           borderLeft:    `2px solid ${chapterTip.chapter.color}`,
           padding:       '5px 9px',
-          fontFamily:    "'Courier Prime', monospace",
+          fontFamily:    "'Open Sans', sans-serif",
           whiteSpace:    'nowrap',
         }}>
           <div style={{ fontSize: '0.65rem', color: chapterTip.chapter.color, fontWeight: 'bold' }}>
             {chapterTip.chapter.title}
           </div>
           <div style={{ fontSize: '0.55rem', color: 'rgba(232,224,208,0.55)', marginTop: 2 }}>
-            {chapterTip.chapter.end ? chapterSpan(chapterTip.chapter.start, chapterTip.chapter.end) : 'ongoing'}
+            {chapterTip.chapter.end ? chapterSpan(chapterTip.chapter.start, chapterTip.chapter.end) : '进行中'}
+          </div>
+          <div style={{ fontSize: '0.5rem', color: 'rgba(232,224,208,0.35)', marginTop: 3 }}>
+            点击钻入 · 双击编辑
           </div>
         </div>
       )}

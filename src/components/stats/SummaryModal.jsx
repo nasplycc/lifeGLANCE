@@ -5,10 +5,10 @@ function formatSpan(ms) {
   const days   = ms / (24 * 3600 * 1000)
   const years  = Math.floor(days / 365.25)
   const months = Math.floor((days % 365.25) / 30.4)
-  if (years > 0 && months > 0) return `${years} yr${years !== 1 ? 's' : ''}, ${months} mo`
-  if (years > 0)               return `${years} yr${years !== 1 ? 's' : ''}`
-  if (months > 0)              return `${months} mo`
-  return `${Math.round(days)} day${Math.round(days) !== 1 ? 's' : ''}`
+  if (years > 0 && months > 0) return `${years}年${months}个月`
+  if (years > 0)               return `${years}年`
+  if (months > 0)              return `${months}个月`
+  return `${Math.round(days)}天`
 }
 
 export default function SummaryModal({ milestones, onClose }) {
@@ -67,38 +67,38 @@ export default function SummaryModal({ milestones, onClose }) {
     <div className="sheet-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
         <div className="sheet-header">
-          <span className="sheet-title">timeline stats</span>
+          <span className="sheet-title">时间线统计</span>
           <button className="sheet-close" onClick={onClose}>✕</button>
         </div>
 
         {!stats ? (
-          <div className="settings-note">no milestones yet</div>
+          <div className="settings-note">暂无里程碑</div>
         ) : (
           <>
             {/* Overview grid */}
             <div className="summary-grid">
               <div className="summary-cell">
                 <div className="summary-value">{stats.total}</div>
-                <div className="summary-label">milestones</div>
+                <div className="summary-label">里程碑</div>
               </div>
               <div className="summary-cell">
                 <div className="summary-value">{stats.past}</div>
-                <div className="summary-label">in the past</div>
+                <div className="summary-label">已发生</div>
               </div>
               <div className="summary-cell">
                 <div className="summary-value">{stats.future}</div>
-                <div className="summary-label">upcoming</div>
+                <div className="summary-label">即将到来</div>
               </div>
               <div className="summary-cell">
                 <div className="summary-value">{stats.spanMs > 0 ? formatSpan(stats.spanMs) : '—'}</div>
-                <div className="summary-label">time tracked</div>
+                <div className="summary-label">时间跨度</div>
               </div>
             </div>
 
             {/* Longest gap */}
             {stats.gapA && stats.gapB && (
               <div className="summary-section">
-                <div className="summary-section-label">longest gap</div>
+                <div className="summary-section-label">最长间隔</div>
                 <div className="summary-gap">
                   <span className="summary-gap-title">{stats.gapA.title}</span>
                   <span className="summary-gap-arrow">→</span>
@@ -111,11 +111,11 @@ export default function SummaryModal({ milestones, onClose }) {
             {/* Busiest year */}
             {stats.busiestEntry && (
               <div className="summary-section">
-                <div className="summary-section-label">busiest year</div>
+                <div className="summary-section-label">最忙碌的一年</div>
                 <div className="summary-busiest">
                   <span className="summary-busiest-year">{stats.busiestEntry[0]}</span>
                   <span className="summary-busiest-count">
-                    {stats.busiestEntry[1]} milestone{stats.busiestEntry[1] !== 1 ? 's' : ''}
+                    {stats.busiestEntry[1]} 个里程碑
                   </span>
                 </div>
               </div>
@@ -124,7 +124,7 @@ export default function SummaryModal({ milestones, onClose }) {
             {/* Decade breakdown */}
             {stats.decades.length > 0 && (
               <div className="summary-section">
-                <div className="summary-section-label">by decade</div>
+                <div className="summary-section-label">按十年</div>
                 <div className="summary-decades">
                   {stats.decades.map(([dec, count]) => (
                     <div key={dec} className="summary-decade-row">

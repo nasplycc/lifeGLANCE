@@ -50,10 +50,10 @@ export default function TimelinePreview({ milestones = [] }) {
           textAnchor="middle"
           fill="#C8A96E"
           fontSize="0.5em"
-          fontFamily="'Courier Prime', monospace"
+          fontFamily="'Open Sans', sans-serif"
           opacity={0.7}
         >
-          today
+          今天
         </text>
 
         {/* Milestone dots */}
@@ -76,7 +76,7 @@ export default function TimelinePreview({ milestones = [] }) {
                 textAnchor="middle"
                 fill="rgba(232,224,208,0.7)"
                 fontSize="0.44em"
-                fontFamily="'Courier Prime', monospace"
+                fontFamily="'Open Sans', sans-serif"
               >
                 {m.title.length > 14 ? m.title.slice(0, 14) + '…' : m.title}
               </text>

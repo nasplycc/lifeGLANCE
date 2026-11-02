@@ -41,7 +41,7 @@ export default function SearchModal({ milestones, chapters = [], onSelect, onClo
           <input
             ref={inputRef}
             className="search-input"
-            placeholder="search milestones..."
+            placeholder="搜索里程碑…"
             value={query}
             onChange={e => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -89,7 +89,7 @@ export default function SearchModal({ milestones, chapters = [], onSelect, onClo
         )}
 
         {trimmed && results.length === 0 && (
-          <div className="search-empty">no results</div>
+          <div className="search-empty">无结果</div>
         )}
 
       </div>

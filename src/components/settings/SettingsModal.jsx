@@ -1,8 +1,11 @@
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import { saveCategories } from '../../utils/colors'
 import { isMuted, setMuted } from '../../utils/audio'
+import { apiGetAllMusic, apiUploadMusic, apiDeleteMusic, apiStorage, apiClearUserData } from '../../lib/api'
+
 
 const TEXT_SIZES_ALL = ['small', 'normal', 'big', 'bigger']
+const TEXT_SIZE_LABELS = { small: '小', normal: '中', big: '大', bigger: '更大' }
 
 const COLOR_PALETTE = [
   '#9370DB', '#A78BFA', '#6366F1', '#3D3580',
@@ -20,16 +23,92 @@ export default function SettingsModal({
   categories, onCategoriesChange,
   clustering, onClusteringChange,
   birthday, onBirthdayChange,
-  milestones,
+  milestones, chapters,
   onExportImage, onSaveBackup, onRestoreFile, onImportIcsFile,
   onClose,
   ultraCompact = false,
+  isGuest = false,
+  user = null,
 }) {
   const [newLabel,  setNewLabel]  = useState('')
   const [newColor,  setNewColor]  = useState(COLOR_PALETTE[0])
   const [soundOn,   setSoundOn]   = useState(() => !isMuted())
   const fileRef    = useRef(null)
   const icsFileRef = useRef(null)
+
+  // ── Music management state (admin only) ──────────────────────────────
+  const [musicList,  setMusicList]  = useState([])
+  const [musicTitle, setMusicTitle] = useState('')
+  const [uploading,  setUploading]  = useState(false)
+  const [musicFile,  setMusicFile]  = useState(null)
+  const musicFileRef = useRef(null)
+  const isAdmin = user?.username === 'jaben'
+
+  // ── Server storage state ───────────────────────────────────────────
+  const [storage, setStorage] = useState(null)
+  const [clearing, setClearing] = useState(false)
+  const [clearConfirm, setClearConfirm] = useState(false)
+
+  useEffect(() => {
+    if (isGuest) return
+    apiStorage().then(setStorage).catch(() => {})
+  }, [isGuest])
+
+  async function handleClearServerData() {
+    if (!clearConfirm) { setClearConfirm(true); return }
+    setClearing(true)
+    try {
+      await apiClearUserData()
+      setStorage({ milestones: 0, chapters: 0, mediaBytes: 0, musicTracks: storage?.musicTracks || 0 })
+      setClearConfirm(false)
+    } catch (err) {
+      console.error('Clear failed:', err)
+    } finally {
+      setClearing(false)
+    }
+  }
+
+  function formatBytes(bytes) {
+    if (bytes === 0) return '0 B'
+    const k = 1024
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i]
+  }
+
+  useEffect(() => {
+    if (!isAdmin) return
+    apiGetAllMusic().then(setMusicList).catch(() => {})
+  }, [isAdmin])
+
+  async function handleMusicUpload() {
+    if (!musicFile || !musicTitle.trim()) return
+    setUploading(true)
+    try {
+      const result = await apiUploadMusic(musicFile, musicTitle.trim())
+      setMusicList(prev => [result, ...prev])
+      setMusicTitle('')
+      setMusicFile(null)
+      if (musicFileRef.current) musicFileRef.current.value = ''
+      window.dispatchEvent(new Event('music-library-changed'))
+    } catch (err) {
+      console.error('Upload failed:', err)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function handleMusicDelete(id) {
+    try {
+      await apiDeleteMusic(id)
+      setMusicList(prev => prev.filter(m => m.id !== id))
+      window.dispatchEvent(new Event('music-library-changed'))
+    } catch (err) {
+      console.error('Delete failed:', err)
+    }
+  }
+
+  // ── End music management ────────────────────────────────────────────
 
   const usedIds = new Set(milestones.map(m => m.category))
 
@@ -63,25 +142,27 @@ export default function SettingsModal({
     onClose()
   }
 
+
+
   return (
     <div className="sheet-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet settings-sheet">
         <div className="sheet-header">
-          <span className="sheet-title">settings</span>
+          <span className="sheet-title">设置</span>
           <button className="sheet-close" onClick={onClose}>✕</button>
         </div>
 
         {/* ── Text size ─────────────────────────────────────────────────── */}
         <div className="settings-section">
-          <div className="settings-label">text size</div>
+          <div className="settings-label">字号</div>
           {ultraCompact ? (
-            <div className="settings-note">text size adjustment unavailable on short screens</div>
+            <div className="settings-note">当前屏幕高度不足，无法调整字号</div>
           ) : (
             <div className="zoom-tabs">
               {TEXT_SIZES_ALL.map(s => (
                 <button key={s}
                   className={`zoom-tab ${textSize === s ? 'active' : ''}`}
-                  onClick={() => onTextSizeChange(s)}>{s}</button>
+                  onClick={() => onTextSizeChange(s)}>{TEXT_SIZE_LABELS[s]}</button>
               ))}
             </div>
           )}
@@ -89,15 +170,15 @@ export default function SettingsModal({
 
         {/* ── Display ───────────────────────────────────────────────────── */}
         <div className="settings-section">
-          <div className="settings-label">display</div>
+          <div className="settings-label">显示</div>
           <label className="settings-toggle-row">
-            <span className="settings-toggle-label">auto-cluster nearby milestones</span>
+            <span className="settings-toggle-label">自动聚合邻近里程碑</span>
             <input type="checkbox" className="settings-toggle"
               checked={clustering}
               onChange={e => onClusteringChange(e.target.checked)} />
           </label>
           <label className="settings-toggle-row">
-            <span className="settings-toggle-label">sound effects</span>
+            <span className="settings-toggle-label">音效</span>
             <input type="checkbox" className="settings-toggle"
               checked={soundOn}
               onChange={e => { setSoundOn(e.target.checked); setMuted(!e.target.checked) }} />
@@ -106,7 +187,7 @@ export default function SettingsModal({
 
         {/* ── Categories ────────────────────────────────────────────────── */}
         <div className="settings-section">
-          <div className="settings-label">categories</div>
+          <div className="settings-label">分类</div>
 
           <div className="settings-cat-list">
             {categories.map(cat => {
@@ -115,11 +196,11 @@ export default function SettingsModal({
                 <div key={cat.id} className="settings-cat-row">
                   <div className="settings-cat-dot" style={{ background: cat.color }} />
                   <span className="settings-cat-name">{cat.label}</span>
-                  {inUse && <span className="settings-cat-inuse">in use</span>}
+                  {inUse && <span className="settings-cat-inuse">使用中</span>}
                   <button
                     className="settings-cat-del"
                     disabled={inUse}
-                    title={inUse ? 'cannot delete — category is in use' : 'delete category'}
+                    title={inUse ? '无法删除 — 分类正在使用' : '删除分类'}
                     onClick={() => handleDelete(cat.id)}
                   >✕</button>
                 </div>
@@ -131,7 +212,7 @@ export default function SettingsModal({
             <div className="settings-cat-add-row">
               <input
                 className="input input-sm"
-                placeholder="new category name"
+                placeholder="新分类名称"
                 value={newLabel}
                 onChange={e => setNewLabel(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAdd()}
@@ -143,7 +224,7 @@ export default function SettingsModal({
                 style={{ fontSize: '0.75rem', padding: '0.4rem 0.85rem', flexShrink: 0 }}
                 disabled={!newLabel.trim()}
                 onClick={handleAdd}
-              >add</button>
+              >添加</button>
             </div>
             <div className="settings-palette">
               {COLOR_PALETTE.map(c => (
@@ -160,9 +241,9 @@ export default function SettingsModal({
 
         {/* ── You ───────────────────────────────────────────────────────── */}
         <div className="settings-section">
-          <div className="settings-label">you</div>
+          <div className="settings-label">个人信息</div>
           <div className="settings-you-row">
-            <span className="settings-you-label">birthday</span>
+            <span className="settings-you-label">生日</span>
             <input
               type="date"
               className="settings-birthday-input"
@@ -173,31 +254,116 @@ export default function SettingsModal({
           </div>
         </div>
 
+
+
+        {/* ── Music Management (admin only) ────────────────────────────── */}
+        {isAdmin && (
+          <div className="settings-section">
+            <div className="settings-label">背景音乐管理</div>
+
+            <div className="settings-music-upload">
+              <input
+                ref={musicFileRef}
+                type="file"
+                accept="audio/*"
+                className="music-upload-input"
+                style={{ flex: 1 }}
+                onChange={e => setMusicFile(e.target.files[0])}
+              />
+              <input
+                className="input input-sm"
+                placeholder="歌曲名"
+                value={musicTitle}
+                onChange={e => setMusicTitle(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleMusicUpload()}
+                maxLength={100}
+                style={{ flex: 1, minWidth: 0 }}
+              />
+              <button
+                className="btn btn-filled"
+                style={{ fontSize: '0.75rem', padding: '0.4rem 0.85rem', flexShrink: 0 }}
+                disabled={!musicFile || !musicTitle.trim() || uploading}
+                onClick={handleMusicUpload}
+              >{uploading ? '上传中…' : '上传'}</button>
+            </div>
+
+            <div className="settings-music-list">
+              {musicList.length === 0 ? (
+                <div className="settings-note">暂无背景音乐</div>
+              ) : (
+                musicList.map(m => (
+                  <div key={m.id} className="settings-music-row">
+                    <span className="settings-music-title">{m.title}{m.artist ? ` — ${m.artist}` : ''}</span>
+                    <button className="settings-music-del" onClick={() => handleMusicDelete(m.id)}>✕</button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Data / backup ─────────────────────────────────────────────── */}
         <div className="settings-section">
-          <div className="settings-label">data</div>
+          <div className="settings-label">数据</div>
           <div className="settings-backup-row">
             <button className="btn"
               style={{ fontSize: '0.75rem', padding: '0.4rem 0.85rem' }}
-              onClick={onExportImage}>export image</button>
+              onClick={onExportImage}>导出图片</button>
             <button className="btn"
               style={{ fontSize: '0.75rem', padding: '0.4rem 0.85rem' }}
-              onClick={onSaveBackup}>save backup</button>
+              onClick={onSaveBackup}>保存备份</button>
             <button className="btn"
               style={{ fontSize: '0.75rem', padding: '0.4rem 0.85rem' }}
-              onClick={() => fileRef.current?.click()}>restore from file</button>
+              onClick={() => fileRef.current?.click()}>从文件恢复</button>
             <button className="btn"
               style={{ fontSize: '0.75rem', padding: '0.4rem 0.85rem' }}
-              onClick={() => icsFileRef.current?.click()}>import .ics</button>
+              onClick={() => icsFileRef.current?.click()}>导入 .ics</button>
             <input ref={fileRef} type="file" accept=".json"
               style={{ display: 'none' }} onChange={handleFileChange} />
             <input ref={icsFileRef} type="file" accept=".ics"
               style={{ display: 'none' }} onChange={handleIcsFileChange} />
           </div>
           <p className="settings-note" style={{ marginTop: '0.5rem' }}>
-            .ics import supports all-day events only. Timed events are skipped — the import dialog shows a count of how many were omitted.
+            .ics 导入仅支持全天事件。有时事件将被跳过 — 导入对话框会显示被跳过的数量。
           </p>
         </div>
+
+        {/* ── Server data ───────────────────────────────────────────────── */}
+        {!isGuest && storage && (
+          <div className="settings-section">
+            <div className="settings-label">服务器数据</div>
+            <div className="settings-storage-grid">
+              <div className="settings-storage-item">
+                <span className="settings-storage-value">{storage.milestones}</span>
+                <span className="settings-storage-unit">里程碑</span>
+              </div>
+              <div className="settings-storage-item">
+                <span className="settings-storage-value">{storage.chapters}</span>
+                <span className="settings-storage-unit">章节</span>
+              </div>
+              <div className="settings-storage-item">
+                <span className="settings-storage-value">{formatBytes(storage.mediaBytes)}</span>
+                <span className="settings-storage-unit">媒体文件</span>
+              </div>
+              <div className="settings-storage-item">
+                <span className="settings-storage-value">{storage.musicTracks || 0}</span>
+                <span className="settings-storage-unit">音乐</span>
+              </div>
+            </div>
+            <button
+              className={`btn ${clearConfirm ? 'btn-danger' : ''}`}
+              style={{ fontSize: '0.75rem', padding: '0.4rem 0.85rem', marginTop: '0.6rem' }}
+              disabled={clearing || storage.milestones === 0}
+              onClick={handleClearServerData}
+            >
+              {clearing ? '清空中…' : clearConfirm ? '确认清空？此操作不可撤销' : '清空服务器数据'}
+            </button>
+            {clearConfirm && (
+              <button className="btn" style={{ fontSize: '0.7rem', padding: '0.3rem 0.7rem', marginLeft: '0.5rem' }}
+                onClick={() => setClearConfirm(false)}>取消</button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

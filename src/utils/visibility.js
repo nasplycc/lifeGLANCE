@@ -101,7 +101,7 @@ export function getMilestoneVisibility(milestone, chapters, precomputed, context
   const memberChapters = chapters.filter(c => c.milestoneIds.includes(milestone.id))
 
   if (memberChapters.length === 0) {
-    return { visible: true, reason: 'no-chapters', endpointChapters: [], inheritedResolution: 'shown', inheritSource: 'not a member of any chapter' }
+    return { visible: true, reason: 'no-chapters', endpointChapters: [], inheritedResolution: 'shown', inheritSource: '未归属任何章节' }
   }
 
   const anyShown = memberChapters.some(c => c.defaultMemberVisibility === 'shown')
@@ -124,6 +124,6 @@ export function getMilestoneVisibility(milestone, chapters, precomputed, context
     reason: 'cascade-hidden',
     endpointChapters: [],
     inheritedResolution: 'hidden',
-    inheritSource: `all member chapters set to hidden (${hiddenNames})`,
+    inheritSource: `所有成员章节均设为隐藏（${hiddenNames})`,
   }
 }

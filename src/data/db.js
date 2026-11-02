@@ -79,7 +79,7 @@ export function initDB() {
         s.openCursor().onsuccess = ev => {
           const c = ev.target.result
           if (!c) {
-            console.log(`[lifeGLANCE v4 migration] mainTimelineVisibility added to ${migratedCount} milestone(s)`)
+            console.log(`[时光墙 v4 migration] mainTimelineVisibility added to ${migratedCount} milestone(s)`)
             return
           }
           if (!('mainTimelineVisibility' in c.value)) {
@@ -182,12 +182,34 @@ export function dbGetMedia(id) {
   })
 }
 
+// Delete a specific media entry by id
+export function dbDeleteMedia(id) {
+  return new Promise((resolve, reject) => {
+    const req = mediaTx('readwrite').delete(id)
+    req.onsuccess = () => resolve()
+    req.onerror   = () => reject(req.error)
+  })
+}
+
 // Wipes the entire media store (called on backup restore so orphans don't linger).
 export function dbClearAllMedia() {
   return new Promise((resolve, reject) => {
     const req = mediaTx('readwrite').clear()
     req.onsuccess = () => resolve()
     req.onerror   = () => reject(req.error)
+  })
+}
+
+// Clear ALL data across all stores (used when entering guest mode)
+export function dbClearAll() {
+  return new Promise((resolve, reject) => {
+    const tx = _db.transaction([STORE, CHAPTERS, MEDIA], 'readwrite')
+    let done = 0
+    const check = () => { if (++done === 3) resolve() }
+    tx.objectStore(STORE).clear().onsuccess = check
+    tx.objectStore(CHAPTERS).clear().onsuccess = check
+    tx.objectStore(MEDIA).clear().onsuccess = check
+    tx.onerror = () => reject(tx.error)
   })
 }
 

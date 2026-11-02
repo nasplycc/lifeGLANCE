@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react'
 import { useTypewriter } from '../../utils/typewriter'
+import TimoraLogo from '../ui/TimoraLogo'
 
-const TAGLINE = 'Your life, at a glance.'
+const TAGLINE = '让时光看得见-by时光(≧ω≦)'
 
 export default function Step1Welcome({ onBegin, onSkip }) {
   // Phase: 'life' → 'glance' → 'tagline' → 'cta'
   const [phase, setPhase] = useState('life')
 
-  const lifeTyped   = useTypewriter('life',   { active: phase === 'life',   delay: 55, jitter: 40 })
-  const glanceTyped = useTypewriter('GLANCE', { active: phase === 'glance', delay: 55, jitter: 40 })
+  const lifeTyped   = useTypewriter('时光', { active: phase === 'life',   delay: 55, jitter: 40 })
+  const glanceTyped = useTypewriter('墙',   { active: phase === 'glance', delay: 55, jitter: 40 })
   const taglineTyped = useTypewriter(TAGLINE,  { active: phase === 'tagline', delay: 30, jitter: 20, startDelay: 200 })
 
   useEffect(() => {
@@ -29,13 +30,14 @@ export default function Step1Welcome({ onBegin, onSkip }) {
     <div className="onboarding-step" style={{ alignItems: 'flex-start' }}>
       {/* Logo animation */}
       <div style={{ lineHeight: 1 }}>
-        <div className="logo">
+        <div className="logo" style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
+          <TimoraLogo compact size="lg" />
           <span className="logo-life">
-            {phase === 'life' ? lifeTyped.displayed : 'life'}
+            {phase === 'life' ? lifeTyped.displayed : '时光'}
             {phase === 'life' && <span className="cursor" />}
           </span>
           <span className="logo-glance">
-            {phase === 'glance' ? glanceTyped.displayed : phase !== 'life' ? 'GLANCE' : ''}
+            {phase === 'glance' ? glanceTyped.displayed : phase !== 'life' ? '墙' : ''}
             {phase === 'glance' && <span className="cursor" />}
           </span>
         </div>
@@ -61,12 +63,12 @@ export default function Step1Welcome({ onBegin, onSkip }) {
         }}
       >
         <button className="btn" onClick={onBegin}>
-          begin →
+          开始 →
         </button>
       </div>
 
       <button className="skip-link" onClick={onSkip}>
-        skip
+        跳过
       </button>
     </div>
   )

@@ -9,20 +9,26 @@ import SearchModal       from '../search/SearchModal'
 import SummaryModal      from '../stats/SummaryModal'
 import OnThisDayModal    from './OnThisDayModal'
 import IcsImportModal    from '../import/IcsImportModal'
+import AccountSettings   from '../../pages/AccountSettings'
 import MinimapBar        from '../minimap/MinimapBar'
 import TypewriterText    from '../ui/TypewriterText'
 import { ZOOM_LEVELS, applyRecurFilter } from '../../utils/timeline'
 import { expandAnnualDates } from '../../utils/recurrence'
 import { loadCategories } from '../../utils/colors'
 import { getMilestoneVisibility, precomputeEndpoints } from '../../utils/visibility'
-import { addMilestone, updateMilestone, deleteMilestone, restoreMilestones, uid } from '../../data/milestones'
+import { addMilestone, updateMilestone, deleteMilestone, restoreMilestones, uid, uploadMediaToServer } from '../../data/milestones'
 import { listChapters, restoreChapters, createChapter, updateChapter, deleteChapter } from '../../data/chapters'
 import ChapterSheet from '../chapter/ChapterSheet'
 import { dbPutMedia, dbPutPhoto, dbDeletePhoto, dbGetPhoto, dbPut } from '../../data/db'
-import { parseIcs }      from '../../utils/icsParser'
+import { isApiAvailable, getLastSyncTime } from '../../lib/sync'
+import SyncModal from '../sync/SyncModal'
+import { apiMediaUrl, apiDeleteMedia } from '../../lib/api'
+import TimoraLogo from '../ui/TimoraLogo'
+import { parseIcs } from '../../utils/icsParser'
 import * as audio from '../../utils/audio'
 
 const ZOOM_RANK = { decades: 5, '30yr': 4, years: 3, months: 2, weeks: 1, custom: 3.5 }
+const ZOOM_LABELS = { decades: '十年', '30yr': '三十年', years: '年', months: '月', weeks: '周', custom: '自定义' }
 
 const TEXT_SIZES = {
   small:  '19px',
@@ -33,7 +39,7 @@ const TEXT_SIZES = {
 
 const ZOOM_ANIM_MS = 420
 
-export default function TimelineView({ milestones, setMilestones }) {
+export default function TimelineView({ milestones, setMilestones, user, onLogout, isGuest }) {
   const [zoom,          setZoom]          = useState('years')
   const [zoomAnim,      setZoomAnim]      = useState('')
   const [filter,        setFilter]        = useState(new Set())
@@ -55,6 +61,8 @@ export default function TimelineView({ milestones, setMilestones }) {
   const [selectedId,    setSelectedId]    = useState(null)
   const [highlightsActive, setHighlightsActive] = useState(true)
   const [settingsOpen,  setSettingsOpen]  = useState(false)
+  const [syncOpen,      setSyncOpen]      = useState(false)
+  const [accountOpen,   setAccountOpen]   = useState(false)
   const [helpOpen,      setHelpOpen]      = useState(false)
   const [searchOpen,    setSearchOpen]    = useState(false)
   const [viewMode,      setViewMode]      = useState('all')
@@ -86,6 +94,7 @@ export default function TimelineView({ milestones, setMilestones }) {
   const [chapters,         setChapters]         = useState([])
   const [chapterSheetOpen, setChapterSheetOpen] = useState(false)
   const [editChapter,      setEditChapter]      = useState(null)
+  const [syncStatus,       setSyncStatus]       = useState(isApiAvailable() ? 'synced' : 'offline')
   const [drilledChapter,   setDrilledChapter]   = useState(null)
   const predrillRef        = useRef(null) // { zoom, customYears, panMs } — ref avoids stale-closure issues
   const [newlyAddedId,     setNewlyAddedId]     = useState(null)
@@ -94,6 +103,7 @@ export default function TimelineView({ milestones, setMilestones }) {
   const [icsImport,     setIcsImport]     = useState(null)  // { candidates, timedCount } | null
   const [toast,         setToast]         = useState(null)  // { message, type } | null
   const [mediaConfirm,  setMediaConfirm]  = useState(null)  // { data, existing, fileSize, remaining } | null
+  const [fullscreen,    setFullscreen]    = useState(false)
 
   const timelineRef    = useRef(null)
   const zoomWrapRef    = useRef(null)
@@ -156,13 +166,29 @@ export default function TimelineView({ milestones, setMilestones }) {
     listChapters().then(setChapters).catch(console.error)
   }, [])
 
-
+  // Periodic sync status check
+  useEffect(() => {
+    const check = () => {
+      setSyncStatus(isApiAvailable() ? 'synced' : 'offline')
+    }
+    check()
+    const iv = setInterval(check, 30000)
+    return () => clearInterval(iv)
+  }, [])
   // Restrict text size: big/bigger cards overflow the axis on short screens.
   useEffect(() => {
     if (ultraCompact && (textSize === 'big' || textSize === 'bigger')) {
       setTextSize('normal')
     }
   }, [ultraCompact, textSize])
+
+  // Fullscreen mode: ESC to exit
+  useEffect(() => {
+    if (!fullscreen) return
+    const onKey = (e) => { if (e.key === 'Escape') setFullscreen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [fullscreen])
 
   // ── Zoom ─────────────────────────────────────────────────────────────────────
   const handleZoom = useCallback((newZoom) => {
@@ -599,9 +625,9 @@ export default function TimelineView({ milestones, setMilestones }) {
                         : photoRemoved ? false
                         : (existing.has_photo ?? false)
         const updated = await updateMilestone(existing.id, { ...milestoneData, media_type: mediaType, has_photo: hasPhoto }, existing)
-        if (mediaFile)    await dbPutMedia(updated.id, mediaFile, mediaFile.type)
-        if (photoFile)    await dbPutPhoto(updated.id, photoFile, photoFile.type)
-        if (photoRemoved) await dbDeletePhoto(updated.id)
+        if (mediaFile)    { await dbPutMedia(updated.id, mediaFile, mediaFile.type); await uploadMediaToServer(updated.id, newMediaType, mediaFile) }
+        if (photoFile)    { await dbPutPhoto(updated.id, photoFile, photoFile.type); await uploadMediaToServer(updated.id, 'photo', photoFile) }
+        if (photoRemoved) { await dbDeletePhoto(updated.id); apiDeleteMedia(updated.id, 'photo') }
         const newMs = milestones.map(m => m.id === existing.id ? updated : m)
         pushHistory(newMs)
         setMilestones(newMs)
@@ -628,7 +654,9 @@ export default function TimelineView({ milestones, setMilestones }) {
             url:        isBase ? milestoneData.url       : '',
           })
           if (isBase && mediaFile) await dbPutMedia(m.id, mediaFile, mediaFile.type)
-          if (isBase && milestoneData.photoFile) await dbPutPhoto(m.id, milestoneData.photoFile, milestoneData.photoFile.type)
+          if (isBase && photoFile) await dbPutPhoto(m.id, photoFile, photoFile.type)
+          if (isBase && mediaFile) await uploadMediaToServer(m.id, newMediaType, mediaFile)
+          if (isBase && photoFile) await uploadMediaToServer(m.id, 'photo', photoFile)
           created.push(m)
         }
         const newMs = [...milestones, ...created]
@@ -640,6 +668,8 @@ export default function TimelineView({ milestones, setMilestones }) {
         const m = await addMilestone({ ...milestoneData, media_type: newMediaType, has_photo: !!photoFile })
         if (mediaFile) await dbPutMedia(m.id, mediaFile, mediaFile.type)
         if (photoFile) await dbPutPhoto(m.id, photoFile, photoFile.type)
+        if (mediaFile) await uploadMediaToServer(m.id, newMediaType, mediaFile)
+        if (photoFile) await uploadMediaToServer(m.id, 'photo', photoFile)
         const newMs = [...milestones, m]
         pushHistory(newMs)
         setMilestones(newMs)
@@ -678,8 +708,8 @@ export default function TimelineView({ milestones, setMilestones }) {
       console.error('Save failed:', err)
       const isQuota = err?.name === 'QuotaExceededError' || err?.code === 22
       showToast(isQuota
-        ? 'Storage full — export a backup to free space, then try again.'
-        : 'Failed to save milestone. Please try again.'
+        ? '存储空间已满 — 建议导出备份释放空间后再试。'
+        : '保存里程碑失败，请重试。'
       )
     }
   }
@@ -696,7 +726,7 @@ export default function TimelineView({ milestones, setMilestones }) {
           const { quota, usage } = await navigator.storage.estimate()
           remaining = quota - usage
           if (remaining < bigFile.size) {
-            showToast('Not enough storage space for this file. Free up space and try again.')
+            showToast('存储空间不足，请释放空间后重试。')
             return
           }
         } catch { /* estimate unavailable, proceed */ }
@@ -718,7 +748,7 @@ export default function TimelineView({ milestones, setMilestones }) {
       setMilestones(newMs)
     } catch (err) {
       console.error('Delete failed:', err)
-      showToast('Failed to delete milestone. Please try again.')
+      showToast('删除里程碑失败，请重试。')
     }
   }
 
@@ -731,7 +761,7 @@ export default function TimelineView({ milestones, setMilestones }) {
       setMilestones(newMs)
     } catch (err) {
       console.error('Delete series failed:', err)
-      showToast('Failed to delete recurring series. Please try again.')
+      showToast('删除重复系列失败，请重试。')
     }
   }
 
@@ -786,7 +816,7 @@ export default function TimelineView({ milestones, setMilestones }) {
       await deleteChapter(id)
     } catch (err) {
       console.error('Failed to delete chapter:', err)
-      showToast('Failed to delete chapter. Please try again.')
+      showToast('删除章节失败，请重试。')
       return
     }
     setChapters(prev => prev.filter(c => c.id !== id))
@@ -872,7 +902,7 @@ export default function TimelineView({ milestones, setMilestones }) {
       bg.setAttribute('fill', '#0F1117')
       clone.insertBefore(bg, clone.firstChild)
 
-      // Embed Courier Prime — fetch the Google Fonts CSS, then each woff2 file,
+      // Embed Open Sans — fetch the Google Fonts CSS, then each woff2 file,
       // encode as base64, and inject a <style> block so the sandboxed SVG img
       // renders the correct font.
       try {
@@ -915,25 +945,63 @@ export default function TimelineView({ milestones, setMilestones }) {
         img.src = svgUrl
       })
 
-      // Draw lifeGLANCE branding watermark in bottom-left corner
-      const brandPad = 20
-      const brandY   = h + topInset - 24
+      // Draw 时光墙 branding watermark in top-left corner (logo + text)
+      const brandPad = 16
+      const brandFontSize = 28
+      const iconSize = 22
+      const brandX = brandPad
+      const brandY = brandPad + iconSize // top padding + icon height
       ctx.save()
       ctx.textBaseline = 'alphabetic'
-      ctx.font = `400 70px 'Courier Prime', 'Courier New', monospace`
-      const lifeW = ctx.measureText('life').width
-      ctx.fillStyle = '#E8E0D0'
-      ctx.fillText('life', brandPad, brandY)
-      ctx.font = `bold italic 75px 'Courier Prime', 'Courier New', monospace`
+      // Draw hourglass icon
+      const ix = brandX
+      const iy = brandPad
+      ctx.strokeStyle = '#C8A96E'
+      ctx.lineWidth = 2
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      // Top frame
+      ctx.beginPath()
+      ctx.moveTo(ix + 4, iy)
+      ctx.lineTo(ix + 4, iy + 7)
+      ctx.quadraticCurveTo(ix + 4, iy + 11, ix + 11, iy + 11)
+      ctx.quadraticCurveTo(ix + 18, iy + 11, ix + 18, iy + 7)
+      ctx.lineTo(ix + 18, iy)
+      ctx.stroke()
+      // Bottom frame
+      ctx.beginPath()
+      ctx.moveTo(ix + 4, iy + iconSize)
+      ctx.lineTo(ix + 4, iy + iconSize - 7)
+      ctx.quadraticCurveTo(ix + 4, iy + iconSize - 11, ix + 11, iy + iconSize - 11)
+      ctx.quadraticCurveTo(ix + 18, iy + iconSize - 11, ix + 18, iy + iconSize - 7)
+      ctx.lineTo(ix + 18, iy + iconSize)
+      ctx.stroke()
+      // Center dot (current moment)
+      ctx.fillStyle = '#C8A96E'
+      ctx.beginPath()
+      ctx.arc(ix + 11, iy + 11, 3, 0, Math.PI * 2)
+      ctx.fill()
+      // Sand dots (past)
+      ctx.fillStyle = '#38B2AC'
+      ctx.globalAlpha = 0.6
+      ctx.beginPath(); ctx.arc(ix + 8, iy + 4, 1.5, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(ix + 13, iy + 3.5, 1.2, 0, Math.PI * 2); ctx.fill()
+      // Sand dots (future)
       ctx.fillStyle = '#3D3580'
-      ctx.fillText('GLANCE', brandPad + lifeW, brandY)
+      ctx.beginPath(); ctx.arc(ix + 8, iy + iconSize - 4, 1.5, 0, Math.PI * 2); ctx.fill()
+      ctx.beginPath(); ctx.arc(ix + 13, iy + iconSize - 3.5, 1.2, 0, Math.PI * 2); ctx.fill()
+      ctx.globalAlpha = 1
+      // Draw 时光墙 text
+      ctx.fillStyle = '#E8E0D0'
+      ctx.font = `bold ${brandFontSize}px 'Open Sans', sans-serif`
+      ctx.fillText('时光墙', ix + iconSize + 6, brandY)
       ctx.restore()
 
       canvas.toBlob(blob => {
         const d = new Date()
         const stamp = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
         const a = document.createElement('a')
-        a.download = `lifeglance-${stamp}.png`
+        a.download = `timora-${stamp}.png`
         a.href = URL.createObjectURL(blob)
         document.body.appendChild(a)
         a.click()
@@ -969,7 +1037,7 @@ export default function TimelineView({ milestones, setMilestones }) {
     a.href     = url
     const d    = new Date()
     const stamp = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-    a.download = `lifeglance-${stamp}.json`
+    a.download = `timora-${stamp}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -1023,7 +1091,7 @@ export default function TimelineView({ milestones, setMilestones }) {
       // ({ milestones, photos, chapters }).  Backups with an 'eras' key instead of
       // 'chapters' are from a pre-rename dev build and are not supported.
       if (!Array.isArray(parsed) && Array.isArray(parsed.eras) && !Array.isArray(parsed.chapters)) {
-        throw new Error('This backup was created before the Chapters rename and cannot be imported. Please regenerate the backup from the app.')
+        throw new Error('该备份在章节重命名前创建，无法导入。请重新从应用中导出备份。')
       }
 
       const items    = Array.isArray(parsed) ? parsed : (parsed.milestones ?? parsed)
@@ -1062,7 +1130,7 @@ export default function TimelineView({ milestones, setMilestones }) {
       setCanRedo(false)
     } catch (err) {
       console.error('Restore failed:', err)
-      showToast(err.message || 'Restore failed. The backup file may be invalid.')
+      showToast(err.message || '恢复失败。备份文件可能无效。')
     }
     e.target.value = ''
   }
@@ -1083,8 +1151,9 @@ export default function TimelineView({ milestones, setMilestones }) {
   }
 
   return (
-    <div className="timeline-view">
+    <div className={`timeline-view${fullscreen ? ' fullscreen-mode' : ''}`}>
       {/* ── Header ─────────────────────────────────────────────────────────── */}
+      {!fullscreen && (
       <div
         className="timeline-header"
         style={drilledChapter ? { borderBottom: `1px solid ${drilledChapter.color}44` } : undefined}
@@ -1094,7 +1163,7 @@ export default function TimelineView({ milestones, setMilestones }) {
           <div className="drill-breadcrumb" style={{ '--drill-color': drilledChapter.color }}>
             <div className="drill-breadcrumb-nav">
               <button className="drill-breadcrumb-life" onClick={() => exitDrillIn()}>
-                <span className="logo-life">life</span><span className="logo-glance">GLANCE</span>
+                <TimoraLogo size="sm" />
               </button>
               <span className="drill-breadcrumb-sep">›</span>
               <TypewriterText
@@ -1105,12 +1174,13 @@ export default function TimelineView({ milestones, setMilestones }) {
                 hideCursorWhenDone
                 className="drill-breadcrumb-chapter"
               />
-              <button className="drill-breadcrumb-close" onClick={() => exitDrillIn()} title="exit chapter view">✕</button>
+              <button className="drill-breadcrumb-close" onClick={() => openChapterEdit(drilledChapter)} title="编辑章节">✎</button>
+              <button className="drill-breadcrumb-close" onClick={() => exitDrillIn()} title="退出章节">✕</button>
             </div>
             <div className="drill-breadcrumb-meta">
-              <span>{fmtChapterDate(drilledChapter.start)} – {drilledChapter.end ? fmtChapterDate(drilledChapter.end) : 'ongoing'}</span>
+              <span>{fmtChapterDate(drilledChapter.start)} – {drilledChapter.end ? fmtChapterDate(drilledChapter.end) : '进行中'}</span>
               <span className="drill-breadcrumb-dot">·</span>
-              <span>{drilledChapter.milestoneIds.length} member{drilledChapter.milestoneIds.length !== 1 ? 's' : ''}</span>
+              <span>{drilledChapter.milestoneIds.length} 个成员</span>
               {drilledChapter.description && <>
                 <span className="drill-breadcrumb-dot">·</span>
                 <span className="drill-breadcrumb-desc">{drilledChapter.description}</span>
@@ -1118,22 +1188,19 @@ export default function TimelineView({ milestones, setMilestones }) {
             </div>
           </div>
         ) : (
-          <div className="logo logo-sm">
-            <span className="logo-life">life</span>
-            <span className="logo-glance">GLANCE</span>
-          </div>
+          <TimoraLogo size="sm" />
         )}
 
         {/* Center: zoom row + view picker */}
         <div className="header-center">
           {compactHeader ? (
-            /* Single row on narrow screens: zoom ▾  |  past ↺  |  rec: next */
+            /* Single row on narrow screens: zoom ▾  |  past ↺  |  循环: next */
             <div className="compact-controls-row">
               <div className="zoom-dropdown-wrap" onClick={e => e.stopPropagation()}>
                 <button
                   className="zoom-tab active zoom-dropdown-btn"
                   onClick={() => setZoomOpen(o => !o)}>
-                  {zoom === 'custom' ? 'custom' : zoom} ▾
+                  {zoom === 'custom' ? '自定义' : zoom === 'decades' ? '十年' : zoom === '30yr' ? '三十年' : zoom === 'years' ? '年' : zoom === 'months' ? '月' : zoom === 'weeks' ? '周' : zoom} ▾
                 </button>
                 {zoomOpen && (
                   <div className="zoom-dropdown">
@@ -1141,7 +1208,7 @@ export default function TimelineView({ milestones, setMilestones }) {
                       <button key={z}
                         className={`zoom-dropdown-item ${zoom === z ? 'active' : ''}`}
                         onClick={() => { handleZoom(z); setZoomOpen(false) }}>
-                        {z}
+                        {ZOOM_LABELS[z] || z}
                       </button>
                     ))}
                   </div>
@@ -1157,7 +1224,7 @@ export default function TimelineView({ milestones, setMilestones }) {
                       const v = parseInt(e.target.value, 10)
                       if (!isNaN(v)) setCustomYears(Math.max(1, Math.min(200, v)))
                     }} />
-                  <span>yr</span>
+                  <span>年</span>
                 </div>
               )}
               <button
@@ -1167,13 +1234,6 @@ export default function TimelineView({ milestones, setMilestones }) {
                 )}>
                 {viewMode} ↺
               </button>
-              {hasRecurring && (
-                <button
-                  className={`recur-filter-btn${recurFilter !== 'next' ? ' active' : ''}`}
-                  onClick={cycleRecurFilter}>
-                  rec: {recurFilter}
-                </button>
-              )}
             </div>
           ) : (
             <>
@@ -1182,11 +1242,11 @@ export default function TimelineView({ milestones, setMilestones }) {
                   {ZOOM_LEVELS.map(z => (
                     <button key={z}
                       className={`zoom-tab ${zoom === z ? 'active' : ''}`}
-                      onClick={() => handleZoom(z)}>{z}</button>
+                      onClick={() => handleZoom(z)}>{ZOOM_LABELS[z] || z}</button>
                   ))}
                   <button
                     className={`zoom-tab ${zoom === 'custom' ? 'active' : ''}`}
-                    onClick={() => handleZoom('custom')}>custom</button>
+                    onClick={() => handleZoom('custom')}>自定义</button>
                 </div>
                 <div className="zoom-indicator">
                   {zoom === 'custom' ? (
@@ -1199,43 +1259,50 @@ export default function TimelineView({ milestones, setMilestones }) {
                           const v = parseInt(e.target.value, 10)
                           if (!isNaN(v)) setCustomYears(Math.max(1, Math.min(200, v)))
                         }} />
-                      <span>yr</span>
+                      <span>年</span>
                     </div>
                   ) : (
-                    <TypewriterText key={zoom} text={`viewing: ${zoom}`}
+                    <TypewriterText key={zoom} text={`视野：${ZOOM_LABELS[zoom] || zoom}`}
                       options={{ delay: 38, jitter: 18 }} showCursor={false} hideCursorWhenDone />
                   )}
                 </div>
-              </div>
-              <div className="view-tabs-row">
-                <div className="view-tabs">
-                  {[['past', '← past'], ['all', '← all →'], ['future', 'future →']].map(([mode, label]) => (
-                    <button key={mode}
-                      className={`view-tab ${viewMode === mode ? 'active' : ''}`}
-                      onClick={() => handleViewMode(mode)}>{label}</button>
-                  ))}
-                </div>
-                {hasRecurring && (
-                  <button
-                    className={`recur-filter-btn${recurFilter !== 'next' ? ' active' : ''}`}
-                    onClick={cycleRecurFilter}>
-                    recurring: {recurFilter}
-                  </button>
-                )}
               </div>
             </>
           )}
         </div>
 
-        {/* Right: stats + settings + help */}
+        {/* Right: sync + user + stats + settings + help */}
         <div className="header-right">
-          <button className="action-link" onClick={() => setSummaryOpen(true)}>stats</button>
+          <span className={`sync-indicator ${syncStatus}`}
+            title={syncStatus === 'synced' ? `数据已同步到服务器${(() => {const s=getLastSyncTime();return s?' · 上次同步：'+new Date(s).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):''})()}` : '离线模式 — 数据仅保存在本地'}>
+            {syncStatus === 'synced' ? '☁' : '⚡'}
+          </span>
+          <button className="action-link sync-btn" onClick={() => setSyncOpen(true)} title="云同步">☁ 同步</button>
+          {user && (
+            <div className="user-menu">
+              {isGuest ? (
+                <>
+                  <span className="user-name guest-badge">预览模式</span>
+                  <button className="btn-logout" onClick={onLogout} title="返回登录页">登录</button>
+                </>
+              ) : (
+                <>
+                  <span className="user-name">{user.username}</span>
+                  <button className="btn-logout" onClick={() => setAccountOpen(true)} title="个人中心">个人中心</button>
+                  <button className="btn-logout" onClick={onLogout} title="退出登录">退出</button>
+                </>
+              )}
+            </div>
+          )}
           <span className="action-sep">|</span>
-          <button className="action-link" onClick={() => setSettingsOpen(true)}>settings</button>
+          <button className="action-link" onClick={() => setSummaryOpen(true)}>统计</button>
           <span className="action-sep">|</span>
-          <button className="action-link" onClick={() => setHelpOpen(true)}>?</button>
+          <button className="action-link" onClick={() => setSettingsOpen(true)}>设置</button>
+          <span className="action-sep">|</span>
+          <button className="action-link" onClick={() => setHelpOpen(true)}>快捷键</button>
         </div>
       </div>
+      )}
 
       {/* ── Body ───────────────────────────────────────────────────────────── */}
       <div className="timeline-body" ref={bodyRef}>
@@ -1280,19 +1347,19 @@ export default function TimelineView({ milestones, setMilestones }) {
         {isEmpty && (
           <div className="empty-state">
             <div className="empty-state-label">
-              no milestones yet.<br />add one to start your timeline.
+              暂无里程碑。<br />添加一条来开始你的时间线。
             </div>
           </div>
         )}
         {!isEmpty && filteredMilestones.length === 0 && (
           <div className="empty-state">
-            <div className="empty-state-label">no milestones in {filter.size === 1 ? 'this category' : 'these categories'}.</div>
+            <div className="empty-state-label">暂无（{filter.size === 1 ? '此分类' : '这些分类'}）.</div>
           </div>
         )}
       </div>
 
       {/* ── Minimap ────────────────────────────────────────────────────────── */}
-      {!isEmpty && (
+      {!fullscreen && !isEmpty && (
         <MinimapBar
           milestones={filteredMilestones}
           chapters={chapters}
@@ -1306,71 +1373,107 @@ export default function TimelineView({ milestones, setMilestones }) {
       )}
 
       {/* ── Bottom bar ─────────────────────────────────────────────────────── */}
+      {!fullscreen && (
       <div className="timeline-bottom">
-        <button className="add-milestone-btn" onClick={() => setAddOpen(true)}>
-          + add milestone
-        </button>
-        <button className="add-chapter-btn" onClick={openChapterCreate}>
-          + add chapter
-        </button>
-
-        {presentCategories.length > 0 && (
-          compactFilter ? (
-            <div className="filter-compact" onClick={e => e.stopPropagation()}>
-              <button className={`filter-chip ${filter.size === 0 ? 'active' : ''}`}
-                onClick={() => { setFilter(new Set()); setFilterOpen(false) }}>all</button>
-              <div className="filter-dropdown-wrap">
-                <button
-                  className={`filter-chip filter-dropdown-btn ${filter.size > 0 ? 'active' : ''}`}
-                  onClick={() => setFilterOpen(o => !o)}>
-                  {filter.size === 1 ? (
-                    <>
-                      <span className="filter-dot"
-                        style={{ background: presentCategories.find(c => filter.has(c.id))?.color }} />
-                      {presentCategories.find(c => filter.has(c.id))?.label}
-                    </>
-                  ) : filter.size > 1 ? `${filter.size} categories` : 'category'} ▾
-                </button>
-                {filterOpen && (
-                  <div className="filter-dropdown">
-                    {presentCategories.map(cat => (
-                      <button key={cat.id}
-                        className={`filter-dropdown-item ${filter.has(cat.id) ? 'active' : ''}`}
-                        onClick={() => toggleCategoryFilter(cat.id)}>
-                        <span className="filter-dot" style={{ background: cat.color }} />
-                        {cat.label}
-                        {filter.has(cat.id) && <span className="filter-check">✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="filter-chips-inline">
-              <button className={`filter-chip ${filter.size === 0 ? 'active' : ''}`}
-                onClick={() => setFilter(new Set())}>all</button>
-              {presentCategories.map(cat => (
-                <button key={cat.id}
-                  className={`filter-chip ${filter.has(cat.id) ? 'active' : ''}`}
-                  onClick={() => toggleCategoryFilter(cat.id)}>
-                  <span className="filter-dot" style={{ background: cat.color }} />
-                  {cat.label}
-                </button>
-              ))}
-            </div>
-          )
-        )}
-
-        {onThisDayItems.length > 0 && (
-          <button className="today-btn otd-btn" onClick={() => setOnThisDayOpen(true)}>
-            on this day
+        <div className="bottom-left">
+          <button className="add-milestone-btn" onClick={() => setAddOpen(true)}>
+            + 添加里程碑
           </button>
-        )}
-        <button className="today-btn" onClick={handleJumpToToday}>
-          jump to today
-        </button>
+          <button className="add-chapter-btn" onClick={openChapterCreate}>
+            + 添加章节
+          </button>
+        </div>
+
+        <div className="bottom-center">
+          <div className="view-tabs">
+            {[['past', '← 过去'], ['all', '← 全部 →'], ['future', '未来 →']].map(([mode, label]) => (
+              <button key={mode}
+                className={`view-tab ${viewMode === mode ? 'active' : ''}`}
+                onClick={() => handleViewMode(mode)}>{label}</button>
+            ))}
+          </div>
+          {hasRecurring && (
+            <button
+              className={`recur-filter-btn${recurFilter !== 'next' ? ' active' : ''}`}
+              onClick={cycleRecurFilter}>
+              循环: {recurFilter}
+            </button>
+          )}
+        </div>
+
+        <div className="bottom-right">
+          {presentCategories.length > 0 && (
+            compactFilter ? (
+              <div className="filter-compact" onClick={e => e.stopPropagation()}>
+                <button className={`filter-chip ${filter.size === 0 ? 'active' : ''}`}
+                  onClick={() => { setFilter(new Set()); setFilterOpen(false) }}>全部</button>
+                <div className="filter-dropdown-wrap">
+                  <button
+                    className={`filter-chip filter-dropdown-btn ${filter.size > 0 ? 'active' : ''}`}
+                    onClick={() => setFilterOpen(o => !o)}>
+                    {filter.size === 1 ? (
+                      <>
+                        <span className="filter-dot"
+                          style={{ background: presentCategories.find(c => filter.has(c.id))?.color }} />
+                        {presentCategories.find(c => filter.has(c.id))?.label}
+                      </>
+                    ) : filter.size > 1 ? `${filter.size} 个分类` : '分类'} ▾
+                  </button>
+                  {filterOpen && (
+                    <div className="filter-dropdown">
+                      {presentCategories.map(cat => (
+                        <button key={cat.id}
+                          className={`filter-dropdown-item ${filter.has(cat.id) ? 'active' : ''}`}
+                          onClick={() => toggleCategoryFilter(cat.id)}>
+                          <span className="filter-dot" style={{ background: cat.color }} />
+                          {cat.label}
+                          {filter.has(cat.id) && <span className="filter-check">✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="filter-chips-inline">
+                <button className={`filter-chip ${filter.size === 0 ? 'active' : ''}`}
+                  onClick={() => setFilter(new Set())}>全部</button>
+                {presentCategories.map(cat => (
+                  <button key={cat.id}
+                    className={`filter-chip ${filter.has(cat.id) ? 'active' : ''}`}
+                    onClick={() => toggleCategoryFilter(cat.id)}>
+                    <span className="filter-dot" style={{ background: cat.color }} />
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+            )
+          )}
+
+          {onThisDayItems.length > 0 && (
+            <button className="today-btn otd-btn" onClick={() => setOnThisDayOpen(true)}>
+              历史上的今天
+            </button>
+          )}
+          <button className="fullscreen-enter-btn" onClick={() => setFullscreen(true)} title="全屏">
+            ⛶
+          </button>
+          <button className="today-btn" onClick={handleJumpToToday}>
+            回到今天
+          </button>
+        </div>
       </div>
+      )}
+
+      {/* ── Fullscreen floating control ─────────────────────────────────────── */}
+      {fullscreen && (
+        <div className="fullscreen-float">
+          <div className="fullscreen-zoom-badge">{ZOOM_LABELS[zoom] || zoom}</div>
+          <button className="fullscreen-exit-btn" onClick={() => setFullscreen(false)} title="退出全屏 (ESC)">
+            ✕ 退出全屏
+          </button>
+        </div>
+      )}
 
       {/* ── Sheets ─────────────────────────────────────────────────────────── */}
       {addOpen && (
@@ -1440,12 +1543,21 @@ export default function TimelineView({ milestones, setMilestones }) {
             localStorage.setItem('lifeglance-birthday', v)
           }}
           milestones={milestones}
+          chapters={chapters}
           onExportImage={handleExportImage}
           onSaveBackup={handleSaveBackup}
           onRestoreFile={handleRestoreFile}
           onImportIcsFile={handleImportIcsFile}
           onClose={() => setSettingsOpen(false)}
+          isGuest={isGuest}
+          user={user}
         />
+      )}
+      {accountOpen && (
+        <AccountSettings onClose={() => setAccountOpen(false)} />
+      )}
+      {syncOpen && (
+        <SyncModal onClose={() => setSyncOpen(false)} onSyncStatusChange={setSyncStatus} />
       )}
       {icsImport && (
         <IcsImportModal
@@ -1459,7 +1571,7 @@ export default function TimelineView({ milestones, setMilestones }) {
       {mediaConfirm && (
         <div className="sheet-overlay" onClick={e => e.target === e.currentTarget && setMediaConfirm(null)}>
           <div className="media-confirm-modal">
-            <p className="media-confirm-title">large file</p>
+            <p className="media-confirm-title">大文件</p>
             <p className="media-confirm-body">
               This file is <strong>{fmtBytes(mediaConfirm.fileSize)}</strong>.
               {mediaConfirm.remaining != null && (
@@ -1467,12 +1579,12 @@ export default function TimelineView({ milestones, setMilestones }) {
               )}
             </p>
             <div className="media-confirm-actions">
-              <button className="btn" onClick={() => setMediaConfirm(null)}>cancel</button>
+              <button className="btn" onClick={() => setMediaConfirm(null)}>取消</button>
               <button className="btn btn-filled" onClick={async () => {
                 const { data, existing } = mediaConfirm
                 setMediaConfirm(null)
                 await executeSave(data, existing)
-              }}>attach anyway</button>
+              }}>仍然添加</button>
             </div>
           </div>
         </div>

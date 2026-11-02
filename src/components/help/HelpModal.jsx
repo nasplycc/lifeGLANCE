@@ -2,24 +2,24 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { version as VERSION } from '../../../package.json'
 
 const SHORTCUTS = [
-  { keys: ['←', '→'],        desc: 'cycle past / future milestones'   },
-  { keys: ['↑', '↓'],        desc: 'zoom out / in'                     },
-  { keys: ['1–9'],            desc: 'custom zoom to N years'            },
-  { keys: ['C'],              desc: 'custom zoom (focus input)'         },
-  { keys: ['T'],              desc: 'jump to today'                     },
-  { keys: ['P'],              desc: 'past view'                         },
-  { keys: ['A'],              desc: 'all view'                          },
-  { keys: ['F'],              desc: 'future view'                       },
-  { keys: ['⌘Z', 'Ctrl+Z'],  desc: 'undo'                              },
-  { keys: ['⌘⇧Z', 'Ctrl+Y'], desc: 'redo'                              },
-  { keys: ['M'],              desc: 'mute / unmute sound'               },
-  { keys: ['n'],              desc: 'new milestone'                     },
-  { keys: ['⇧N'],            desc: 'new chapter'                       },
-  { keys: ['E'],              desc: 'export image'                      },
-  { keys: ['/'],              desc: 'search milestones'                 },
-  { keys: ['S'],              desc: 'settings'                          },
-  { keys: ['?'],              desc: 'help'                              },
-  { keys: ['Esc'],            desc: 'close modal / exit chapter / exit input' },
+  { keys: ['←', '→'],        desc: '切换过去/未来里程碑'   },
+  { keys: ['↑', '↓'],        desc: '缩小/放大'                     },
+  { keys: ['1–9'],            desc: '自定义缩放到 N 年'            },
+  { keys: ['C'],              desc: '自定义缩放（聚焦输入框）'         },
+  { keys: ['T'],              desc: '回到今天'                     },
+  { keys: ['P'],              desc: '过去视图'                         },
+  { keys: ['A'],              desc: '全部视图'                          },
+  { keys: ['F'],              desc: '未来视图'                       },
+  { keys: ['⌘Z', 'Ctrl+Z'],  desc: '撤销'                              },
+  { keys: ['⌘⇧Z', 'Ctrl+Y'], desc: '重做'                              },
+  { keys: ['M'],              desc: '静音/取消静音'               },
+  { keys: ['n'],              desc: '新建里程碑'                     },
+  { keys: ['⇧N'],            desc: '新建章节'                       },
+  { keys: ['E'],              desc: '导出图片'                      },
+  { keys: ['/'],              desc: '搜索里程碑'                 },
+  { keys: ['S'],              desc: '设置'                          },
+  { keys: ['?'],              desc: '帮助'                              },
+  { keys: ['Esc'],            desc: '关闭弹窗/退出章节/退出输入' },
 ]
 
 function fmtBytes(n) {
@@ -64,13 +64,13 @@ export default function HelpModal({ onClose }) {
 
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="sheet-header">
-          <span className="sheet-title">help</span>
+          <span className="sheet-title">帮助</span>
           <button className="sheet-close" onClick={onClose}>✕</button>
         </div>
 
         {/* ── Keyboard shortcuts ──────────────────────────────────────────── */}
         <div className="settings-section">
-          <div className="settings-label">keyboard shortcuts</div>
+          <div className="settings-label">键盘快捷键</div>
           <table className="help-shortcuts-table">
             <tbody>
               {SHORTCUTS.map(({ keys, desc }) => (
@@ -89,21 +89,21 @@ export default function HelpModal({ onClose }) {
         <div className="help-footer">
           <div className="help-footer-storage">
             <span className="help-footer-meta">
-              indexedDB&ensp;
+              数据库
               <span className="help-footer-value">
-                {idbEst ? `${fmtBytes(idbEst.usage)} used` : '…'}
+                {idbEst ? `${fmtBytes(idbEst.usage)} 已使用` : '…'}
               </span>
               {idbEst && (
                 <>
                   <span className="help-footer-dim"> / </span>
-                  <span className="help-footer-value">{fmtBytes(idbEst.quota)} available</span>
+                  <span className="help-footer-value">{fmtBytes(idbEst.quota)} 可用</span>
                 </>
               )}
             </span>
             <span className="help-footer-meta">
-              localStorage&ensp;
+              本地存储
               <span className="help-footer-value">{localSize}</span>
-              <span className="help-footer-dim"> (settings only)</span>
+              <span className="help-footer-dim">（仅设置）</span>
             </span>
           </div>
           <span className="help-footer-meta help-footer-version">v{VERSION}</span>

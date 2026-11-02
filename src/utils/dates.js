@@ -34,28 +34,28 @@ export function relativeLabel(dateStr, precision = 'day') {
     const years  = differenceInYears(now, date)
     const months = differenceInMonths(now, date) % 12
     const days   = differenceInDays(now, date)
-    if (years > 0 && months > 0) return `${years} yr${years !== 1 ? 's' : ''}, ${months} mo ago`
-    if (years > 0)               return `${years} yr${years !== 1 ? 's' : ''} ago`
-    if (days > 30)               return `${Math.floor(days / 30)} mo ago`
-    if (days > 0)                return `${days} day${days !== 1 ? 's' : ''} ago`
-    return 'today'
+    if (years > 0 && months > 0) return `${years}年${months}个月前`
+    if (years > 0)               return `${years}年前`
+    if (days > 30)               return `${Math.floor(days / 30)}个月前`
+    if (days > 0)                return `${days}天前`
+    return '今天'
   } else {
     const years  = differenceInYears(date, now)
     const months = differenceInMonths(date, now) % 12
     const days   = differenceInDays(date, now)
-    if (years > 0 && months > 0) return `in ${years} yr${years !== 1 ? 's' : ''}, ${months} mo`
-    if (years > 0)               return `in ${years} yr${years !== 1 ? 's' : ''}`
-    if (days > 30)               return `in ${Math.floor(days / 30)} mo`
-    if (days >= 0)               return `in ${days} day${days !== 1 ? 's' : ''}`
-    return 'today'
+    if (years > 0 && months > 0) return `还有${years}年${months}个月`
+    if (years > 0)               return `还有${years}年`
+    if (days > 30)               return `还有${Math.floor(days / 30)}个月`
+    if (days >= 0)               return `还有${days}天`
+    return '今天'
   }
 }
 
 export function formatDateDisplay(dateStr, precision = 'day') {
   const date = toLocalNoon(dateStr)
   if (precision === 'year')  return format(date, 'yyyy')
-  if (precision === 'month') return format(date, 'MMMM yyyy')
-  return format(date, 'MMMM d, yyyy')
+  if (precision === 'month') return format(date, 'yyyy年M月')
+  return format(date, 'yyyy年M月d日')
 }
 
 // Returns { years, months } elapsed/remaining for count-up animation

@@ -3,9 +3,9 @@ import TypewriterText from '../ui/TypewriterText'
 import { useCountUp } from '../../utils/typewriter'
 import { getYearsMonths } from '../../utils/dates'
 
-const PROMPT = "Here's your life, at a glance."
+const PROMPT = "让时光看得见-by时光(≧ω≦)"
 
-export default function Step4Reveal({ onComplete, pastMilestone, futureMilestone }) {
+export default function Step4Reveal({ onComplete, onSkip, pastMilestone, futureMilestone }) {
   const [phase, setPhase] = useState('typing') // typing → row1 → row2 → cta
 
   // Derived time distances
@@ -34,23 +34,21 @@ export default function Step4Reveal({ onComplete, pastMilestone, futureMilestone
   const formatFutureTime = () => {
     if (!futureInfo) return '—'
     if (futureInfo.years > 0) {
-      const yr = `${futureYears} yr${futureInfo.years !== 1 ? 's' : ''}`
       return futureInfo.months > 0
-        ? `in ${yr}, ${futureMonths} mo`
-        : `in ${yr}`
+        ? `还有${futureYears}年${futureMonths}个月`
+        : `还有${futureYears}年`
     }
-    return `in ${futureDays} day${futureInfo.days !== 1 ? 's' : ''}`
+    return `还有${futureDays}天`
   }
 
   const formatPastTime = () => {
     if (!pastInfo) return '—'
     if (pastInfo.years > 0) {
-      const yr = `${pastYears} yr${pastInfo.years !== 1 ? 's' : ''}`
       return pastInfo.months > 0
-        ? `${yr}, ${pastMonths} mo ago`
-        : `${yr} ago`
+        ? `${pastYears}年${pastMonths}个月前`
+        : `${pastYears}年前`
     }
-    return `${pastInfo.days} days ago`
+    return `${pastInfo.days}天前`
   }
 
   return (
@@ -63,7 +61,7 @@ export default function Step4Reveal({ onComplete, pastMilestone, futureMilestone
           <div className="progress-dot active" />
         </div>
         <div className="onboarding-eyebrow" style={{ marginTop: '0.5rem' }}>
-          step 4 of 4 — your timeline
+          第 4 步，共 4 步 — 你的时间线
         </div>
       </div>
 
@@ -81,22 +79,22 @@ export default function Step4Reveal({ onComplete, pastMilestone, futureMilestone
       <div className="stat-reveal-rows">
         {/* Past stat */}
         <div className={`stat-reveal-row ${phase !== 'typing' ? 'visible' : ''}`}>
-          <div className="stat-reveal-label">looking back</div>
+          <div className="stat-reveal-label">回望过去</div>
           <div className="stat-reveal-value">
             {pastMilestone
               ? <>{pastMilestone.title} — <em>{formatPastTime()}</em></>
-              : <span style={{ color: 'var(--text-muted)' }}>no past event added</span>
+              : <span style={{ color: 'var(--text-muted)' }}>尚未添加过去的事件</span>
             }
           </div>
         </div>
 
         {/* Future stat */}
         <div className={`stat-reveal-row ${phase === 'row2' || phase === 'cta' ? 'visible' : ''}`}>
-          <div className="stat-reveal-label">looking ahead</div>
+          <div className="stat-reveal-label">展望未来</div>
           <div className="stat-reveal-value">
             {futureMilestone
               ? <>{futureMilestone.title} — <em>{formatFutureTime()}</em></>
-              : <span style={{ color: 'var(--text-muted)' }}>no future event added</span>
+              : <span style={{ color: 'var(--text-muted)' }}>尚未添加未来的事件</span>
             }
           </div>
         </div>
@@ -114,10 +112,13 @@ export default function Step4Reveal({ onComplete, pastMilestone, futureMilestone
         }}
       >
         <button className="btn btn-filled" onClick={onComplete}>
-          open my timeline →
+          打开我的时间线 →
         </button>
-        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: "'Courier Prime', monospace" }}>
-          press <kbd style={{ fontSize: '0.85em', padding: '0.1em 0.35em', borderRadius: 3, border: '1px solid var(--border)', color: 'var(--text-dim)' }}>?</kbd> anytime for keyboard shortcuts
+        <button className="skip-link" onClick={onSkip}>
+          跳过
+        </button>
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: "'Open Sans', sans-serif" }}>
+          按 <kbd style={{ fontSize: '0.85em', padding: '0.1em 0.35em', borderRadius: 3, border: '1px solid var(--border)', color: 'var(--text-dim)' }}>?</kbd> 查看键盘快捷键
         </div>
       </div>
     </div>

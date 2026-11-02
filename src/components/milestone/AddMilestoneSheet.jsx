@@ -5,10 +5,10 @@ import { dbGetPhoto } from '../../data/db'
 import { getMilestoneVisibility } from '../../utils/visibility'
 
 const MONTHS = [
-  { v: '1',  l: 'Jan' }, { v: '2',  l: 'Feb' }, { v: '3',  l: 'Mar' },
-  { v: '4',  l: 'Apr' }, { v: '5',  l: 'May' }, { v: '6',  l: 'Jun' },
-  { v: '7',  l: 'Jul' }, { v: '8',  l: 'Aug' }, { v: '9',  l: 'Sep' },
-  { v: '10', l: 'Oct' }, { v: '11', l: 'Nov' }, { v: '12', l: 'Dec' },
+  { v: '1',  l: '1月' }, { v: '2',  l: '2月' }, { v: '3',  l: '3月' },
+  { v: '4',  l: '4月' }, { v: '5',  l: '5月' }, { v: '6',  l: '6月' },
+  { v: '7',  l: '7月' }, { v: '8',  l: '8月' }, { v: '9',  l: '9月' },
+  { v: '10', l: '10月' }, { v: '11', l: '11月' }, { v: '12', l: '12月' },
 ]
 
 export default function AddMilestoneSheet({ onSave, onClose, existing, categories = DEFAULT_CATEGORIES, chapters = [], visibilityPrecomputed = { endpointChapterNames: new Map() }, drilledChapter = null }) {
@@ -216,17 +216,17 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
     <div className="sheet-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <form className="sheet" onSubmit={handleSubmit}>
         <div className="sheet-header">
-          <span className="sheet-title">{isEdit ? 'edit milestone' : 'add milestone'}</span>
+          <span className="sheet-title">{isEdit ? '编辑里程碑' : '添加里程碑'}</span>
           <button type="button" className="sheet-close" onClick={onClose}>✕</button>
         </div>
 
         {/* Title */}
         <div className="sheet-field">
-          <label className="field-label">event name</label>
+          <label className="field-label">事件名称</label>
           <input
             className="input"
             type="text"
-            placeholder="e.g. Moved to Portland"
+            placeholder="例如：搬到新家"
             value={title}
             onChange={e => setTitle(e.target.value)}
             autoComplete="off"
@@ -237,11 +237,11 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
 
         {/* Date */}
         <div className="sheet-field">
-          <label className="field-label">date</label>
+          <label className="field-label">日期</label>
           <div className="date-grid">
             {precision !== 'year' && (
               <div>
-                <label className="field-label">month</label>
+                <label className="field-label">月份</label>
                 <select
                   className="input input-sm"
                   value={month}
@@ -257,7 +257,7 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
 
             {precision === 'day' && (
               <div>
-                <label className="field-label">day</label>
+                <label className="field-label">日</label>
                 <input
                   className="input input-sm"
                   type="number"
@@ -270,7 +270,7 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
             )}
 
             <div>
-              <label className="field-label">year</label>
+              <label className="field-label">年份</label>
               <input
                 className="input input-sm"
                 type="number"
@@ -285,22 +285,25 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
 
           {/* Precision toggle */}
           <div className="precision-tabs">
-            {['day', 'month', 'year'].map(p => (
-              <button
-                key={p}
-                type="button"
-                className={`precision-tab ${precision === p ? 'active' : ''}`}
-                onClick={() => setPrecision(p)}
-              >
-                {p}
-              </button>
-            ))}
+            {['日', '月', '年'].map((label, i) => {
+              const p = ['day', 'month', 'year'][i]
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  className={`precision-tab ${precision === p ? 'active' : ''}`}
+                  onClick={() => setPrecision(p)}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
         {/* Category */}
         <div className="sheet-field">
-          <label className="field-label">category</label>
+          <label className="field-label">分类</label>
           <div className="category-grid">
             {categories.map(cat => (
               <div
@@ -317,10 +320,10 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
 
         {/* Note */}
         <div className="sheet-field">
-          <label className="field-label">note (optional)</label>
+          <label className="field-label">备注（可选）</label>
           <textarea
             className="input"
-            placeholder="Any details you want to remember…"
+            placeholder="想记住的细节…"
             value={note}
             onChange={e => setNote(e.target.value)}
             rows={3}
@@ -331,7 +334,7 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
 
         {/* URL */}
         <div className="sheet-field">
-          <label className="field-label">link (optional)</label>
+          <label className="field-label">链接（可选）</label>
           <input
             className="input"
             type="url"
@@ -344,32 +347,32 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
 
         {/* Photo */}
         <div className="sheet-field">
-          <label className="field-label">photo (optional)</label>
+          <label className="field-label">照片（可选）</label>
           {previewUrl ? (
             <div className="photo-preview-wrap">
               <img src={previewUrl} className="photo-preview" alt="milestone" />
               <button type="button" className="photo-remove" onClick={handlePhotoRemove}>
-                remove
+                移除
               </button>
             </div>
           ) : hasExisting ? (
             // Existing photo not yet loaded from IDB — show placeholder while loading
             <div className="audio-attached-row">
-              <span className="audio-attached-label">photo attached</span>
+              <span className="audio-attached-label">已添加照片</span>
               <button type="button" className="btn-ghost" style={{ fontSize: '0.72rem' }}
                 onClick={() => photoRef.current?.click()}>
-                replace
+                替换
               </button>
               <button type="button" className="btn-ghost" style={{ fontSize: '0.72rem' }}
                 onClick={handlePhotoRemove}>
-                remove
+                移除
               </button>
             </div>
           ) : (
             <button type="button" className="btn"
               style={{ fontSize: '0.75rem', padding: '0.4rem 0.85rem', alignSelf: 'flex-start' }}
               onClick={() => photoRef.current?.click()}>
-              attach photo
+              添加照片
             </button>
           )}
           <input
@@ -381,7 +384,7 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
 
         {/* Media (audio / video) */}
         <div className="sheet-field">
-          <label className="field-label">audio / video (optional)</label>
+          <label className="field-label">音频 / 视频（可选）</label>
           {mediaFile && mediaObjectUrl ? (
             // New file selected this session — show inline preview
             <div className="media-preview-wrap">
@@ -395,29 +398,29 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
                   setMediaObjectUrl(null)
                   if (mediaRef.current) mediaRef.current.value = ''
                 }}>
-                remove
+                移除
               </button>
             </div>
           ) : existing?.media_type && !mediaRemoved ? (
             // Existing media — show indicator with replace/remove
             <div className="audio-attached-row">
               <span className="audio-attached-label">
-                {existing.media_type === 'video' ? '▶ video attached' : '♪ audio attached'}
+                {existing.media_type === 'video' ? '▶ 已添加视频' : '♪ 已添加音频'}
               </span>
               <button type="button" className="btn-ghost" style={{ fontSize: '0.72rem' }}
                 onClick={() => mediaRef.current?.click()}>
-                replace
+                替换
               </button>
               <button type="button" className="btn-ghost" style={{ fontSize: '0.72rem' }}
                 onClick={() => { setMediaRemoved(true); setMediaFile(null) }}>
-                remove
+                移除
               </button>
             </div>
           ) : (
             <button type="button" className="btn"
               style={{ fontSize: '0.75rem', padding: '0.4rem 0.85rem', alignSelf: 'flex-start' }}
               onClick={() => mediaRef.current?.click()}>
-              attach audio / video
+              添加音频 / 视频
             </button>
           )}
           <input
@@ -437,7 +440,7 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
         {!isEdit && (
           <div className="sheet-field">
             <label className="recurrence-toggle-row">
-              <span className="field-label" style={{ marginBottom: 0 }}>repeats annually</span>
+              <span className="field-label" style={{ marginBottom: 0 }}>每年重复</span>
               <input type="checkbox" className="settings-toggle"
                 checked={recurrence}
                 onChange={e => { setRecurrence(e.target.checked); setRecEndYear('') }} />
@@ -469,7 +472,7 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
                     max={maxYear}
                   />
                   <span className="recurrence-range-count">
-                    {count} instance{count !== 1 ? 's' : ''}
+                    {count} 个实例
                   </span>
                 </div>
               )
@@ -478,60 +481,63 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
         )}
         {isEdit && existing?.recurrence === 'annual' && (
           <div className="sheet-field">
-            <div className="detail-recurrence-warn">↻ repeats annually — editing this instance only</div>
+            <div className="detail-recurrence-warn">↻ 每年重复 — 仅编辑此实例</div>
           </div>
         )}
 
         {/* Visibility (edit mode only) */}
         {isEdit && (
           <div className="sheet-field">
-            <label className="field-label">main timeline visibility</label>
+            <label className="field-label">主时间线可见性</label>
 
             {/* Endpoint override notice — shown when a chapter's start/end anchors this milestone */}
             {visInfo?.reason === 'endpoint' && (
               <div className="vis-endpoint-notice">
                 <span className="vis-endpoint-icon">⚓</span>
                 <span>
-                  endpoint of {visInfo.endpointChapters.map(t => `'${t}'`).join(', ')} —
-                  always shown regardless of setting below
+                  {visInfo.endpointChapters.map(t => `'${t}'`).join(', ')} 的端点 —
+                  始终显示，不受下方设置影响
                 </span>
               </div>
             )}
 
             {/* Three-way toggle: inherit / shown / hidden */}
             <div className="vis-toggle-row">
-              {['inherit', 'shown', 'hidden'].map(v => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`vis-tab${visibility === v ? ' active' : ''}`}
-                  onClick={() => setVisibility(v)}
-                >
-                  {v}
-                </button>
-              ))}
+              {['inherit', 'shown', 'hidden'].map(v => {
+                const label = v === 'inherit' ? '继承' : v === 'shown' ? '显示' : '隐藏'
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`vis-tab${visibility === v ? ' active' : ''}`}
+                    onClick={() => setVisibility(v)}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
             </div>
 
             {/* Status line — explains the resolved behavior */}
             {visInfo && (
               <div className={`vis-status ${visInfo.visible ? 'vis-status-shown' : 'vis-status-hidden'}`}>
                 {visInfo.reason === 'endpoint' && (
-                  'shown (endpoint floor — overrides setting above)'
+                  '显示（章节端点覆盖）'
                 )}
                 {visInfo.reason === 'milestone-shown' && (
-                  'shown (set explicitly)'
+                  '显示（已手动设置）'
                 )}
                 {visInfo.reason === 'milestone-hidden' && (
-                  'hidden (set explicitly)'
+                  '隐藏（已手动设置）'
                 )}
                 {visInfo.reason === 'cascade-shown' && (
-                  `shown (inheriting — ${visInfo.inheritSource})`
+                  `显示（继承自 ${visInfo.inheritSource}）`
                 )}
                 {visInfo.reason === 'cascade-hidden' && (
-                  `hidden (inheriting — ${visInfo.inheritSource})`
+                  `隐藏（继承自 ${visInfo.inheritSource}）`
                 )}
                 {visInfo.reason === 'no-chapters' && (
-                  'shown (inheriting — not a member of any chapter)'
+                  '显示（未归属任何章节）'
                 )}
               </div>
             )}
@@ -541,7 +547,7 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
         {/* Chapter membership suggestion — create mode only */}
         {!isEdit && overlappingChapters.length > 0 && (
           <div className="sheet-field">
-            <label className="field-label">add to chapters</label>
+            <label className="field-label">添加到章节</label>
             <div className="chapter-members-list">
               {overlappingChapters.map(ch => (
                 <label key={ch.id} className="chapter-member-row">
@@ -562,7 +568,7 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
         {/* Close ongoing chapters at this milestone's date — create mode only, unchecked by default */}
         {!isEdit && closableChapters.length > 0 && (
           <div className="sheet-field">
-            <label className="field-label">close ongoing chapter at this date</label>
+            <label className="field-label">在此日期关闭进行中的章节</label>
             <div className="chapter-members-list">
               {closableChapters.map(ch => (
                 <label key={ch.id} className="chapter-member-row">
@@ -585,10 +591,10 @@ export default function AddMilestoneSheet({ onSave, onClose, existing, categorie
           <span />
           <div className="sheet-actions-right">
             <button type="button" className="btn" onClick={onClose} style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem' }}>
-              cancel
+              取消
             </button>
             <button type="submit" className="btn btn-filled" disabled={!canSave || busy} style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem' }}>
-              {busy ? 'saving…' : isEdit ? 'save changes' : 'add to timeline'}
+              {busy ? '保存中…' : isEdit ? '保存修改' : '添加到时间线'}
             </button>
           </div>
         </div>

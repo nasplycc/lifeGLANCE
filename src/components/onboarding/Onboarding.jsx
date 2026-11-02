@@ -42,7 +42,7 @@ export default function Onboarding({ onComplete }) {
       {step === 1 && <Step1Welcome onBegin={handleBegin} onSkip={finish} />}
       {step === 2 && <Step2Past    onSubmit={handlePast}    onSkip={finish} />}
       {step === 3 && <Step3Future  onSubmit={handleFuture}  onSkip={finish} pastMilestone={pastMilestone} />}
-      {step === 4 && <Step4Reveal  onComplete={finish} pastMilestone={pastMilestone} futureMilestone={futureMilestone} />}
+      {step === 4 && <Step4Reveal  onComplete={finish} onSkip={finish} pastMilestone={pastMilestone} futureMilestone={futureMilestone} />}
 
       {/* Timeline preview strip appears from step 2 onwards */}
       {step >= 2 && <TimelinePreview milestones={previewMilestones} />}

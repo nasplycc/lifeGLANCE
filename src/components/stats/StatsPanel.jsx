@@ -62,7 +62,7 @@ export default function StatsPanel({ past, future, pastIdx, futureIdx, onPastCha
           <div className="stat-pill-wrap">
             <button className={`stat-pill${pastOpen ? ' stat-pill-active' : ''}`}
               onClick={() => setPastOpen(o => !o)}>
-              ← past
+← 过去
             </button>
             {pastOpen && (
               <div className="stat-panel stat-panel-popup"
@@ -76,7 +76,7 @@ export default function StatsPanel({ past, future, pastIdx, futureIdx, onPastCha
                 }}
               >
                 <div className="stat-panel-count">
-                  {past.length} milestone{past.length !== 1 ? 's' : ''}
+{past.length} 个里程碑
                 </div>
                 <NavRow idx={pastIdx} total={past.length} onChange={onPastChange} align="left" flip />
                 {past[pastIdx] && <StatMilestone m={past[pastIdx]} align="left" />}
@@ -88,7 +88,7 @@ export default function StatsPanel({ past, future, pastIdx, futureIdx, onPastCha
           <div className="stat-pill-wrap stat-pill-wrap-right">
             <button className={`stat-pill${futureOpen ? ' stat-pill-active' : ''}`}
               onClick={() => setFutureOpen(o => !o)}>
-              future →
+未来 →
             </button>
             {futureOpen && (
               <div className="stat-panel stat-panel-right stat-panel-popup"
@@ -102,7 +102,7 @@ export default function StatsPanel({ past, future, pastIdx, futureIdx, onPastCha
                 }}
               >
                 <div className="stat-panel-count">
-                  {future.length} milestone{future.length !== 1 ? 's' : ''}
+{future.length} 个里程碑
                 </div>
                 <NavRow idx={futureIdx} total={future.length} onChange={onFutureChange} align="right" />
                 {future[futureIdx] && <StatMilestone m={future[futureIdx]} align="right" />}
@@ -128,9 +128,9 @@ export default function StatsPanel({ past, future, pastIdx, futureIdx, onPastCha
           pastSwipeX.current = null
         }}
       >
-        <div className="stat-panel-label">← past</div>
+        <div className="stat-panel-label">← 过去</div>
         <div className="stat-panel-count">
-          {past.length} milestone{past.length !== 1 ? 's' : ''}
+          {past.length} 个里程碑
         </div>
         <NavRow idx={pastIdx} total={past.length} onChange={onPastChange} align="left" flip />
         {past[pastIdx] && <StatMilestone m={past[pastIdx]} align="left" />}
@@ -148,9 +148,9 @@ export default function StatsPanel({ past, future, pastIdx, futureIdx, onPastCha
           futureSwipeX.current = null
         }}
       >
-        <div className="stat-panel-label">future →</div>
+        <div className="stat-panel-label">未来 →</div>
         <div className="stat-panel-count">
-          {future.length} milestone{future.length !== 1 ? 's' : ''}
+          {future.length} 个里程碑
         </div>
         <NavRow idx={futureIdx} total={future.length} onChange={onFutureChange} align="right" />
         {future[futureIdx] && <StatMilestone m={future[futureIdx]} align="right" />}

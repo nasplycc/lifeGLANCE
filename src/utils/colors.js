@@ -1,11 +1,11 @@
 export const DEFAULT_CATEGORIES = [
-  { id: 'personal',  label: 'personal',  color: '#9370DB' },
-  { id: 'family',    label: 'family',    color: '#9370DB' },
-  { id: 'travel',    label: 'travel',    color: '#C8A96E' },
-  { id: 'career',    label: 'career',    color: '#4A90D9' },
-  { id: 'home',      label: 'home',      color: '#38B2AC' },
-  { id: 'health',    label: 'health',    color: '#E85D75' },
-  { id: 'education', label: 'education', color: '#5CAD6E' },
+  { id: 'personal',  label: '个人',  color: '#9370DB' },
+  { id: 'family',    label: '家庭',    color: '#9370DB' },
+  { id: 'travel',    label: '旅行',    color: '#C8A96E' },
+  { id: 'career',    label: '事业',    color: '#4A90D9' },
+  { id: 'home',      label: '家居',      color: '#38B2AC' },
+  { id: 'health',    label: '健康',    color: '#E85D75' },
+  { id: 'education', label: '教育', color: '#5CAD6E' },
 ]
 
 // Kept for onboarding and other static imports

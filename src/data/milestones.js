@@ -1,11 +1,15 @@
-import { dbGetAll, dbAdd, dbPut, dbDelete, dbClearAllMedia } from './db'
+import { dbGetAll, dbAdd, dbPut, dbDelete, dbGetPhoto, dbDeletePhoto, dbDeleteMedia } from './db'
 import { categoryColor } from '../utils/colors'
+import {
+  apiCreateMilestone, apiUpdateMilestone, apiDeleteMilestone, apiDeleteSeries,
+  apiRestoreMilestones, apiUploadMedia, apiDeleteMedia, apiMediaUrl,
+} from '../lib/api'
+import { isApiAvailable, withRetry } from '../lib/sync'
 
 export function uid() {
   if (typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
   }
-  // Fallback for non-secure (HTTP) contexts — randomUUID requires HTTPS
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = crypto.getRandomValues(new Uint8Array(1))[0] & 15
     return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
@@ -57,6 +61,13 @@ export async function loadMilestones() {
 export async function addMilestone(data) {
   const m = buildMilestone(data)
   await dbAdd(m)
+  if (isApiAvailable()) {
+    try {
+      await withRetry(() => apiCreateMilestone(m), 'createMilestone')
+    } catch (err) {
+      console.warn('[sync] createMilestone failed:', err)
+    }
+  }
   return m
 }
 
@@ -68,7 +79,6 @@ export async function updateMilestone(id, updates, existing) {
   const today   = new Date()
   const now     = new Date().toISOString()
 
-  // Strip photo_uri from any legacy data still in flight
   const { photo_uri: _discard, ...safeUpdates } = updates
 
   const m = {
@@ -81,26 +91,97 @@ export async function updateMilestone(id, updates, existing) {
     updated_at: now,
   }
   await dbPut(m)
+  if (isApiAvailable()) {
+    withRetry(() => apiUpdateMilestone(id, m), 'updateMilestone').catch(err =>
+      console.warn('[sync] updateMilestone failed:', err)
+    )
+  }
   return m
 }
 
 export async function deleteMilestone(id) {
   await dbDelete(id)
+  await dbDeletePhoto(id)
+  try { await dbDeleteMedia(id) } catch {}
+  try { await dbDeleteMedia(`${id}-audio`) } catch {}
+  try { await dbDeleteMedia(`${id}-video`) } catch {}
+  if (isApiAvailable()) {
+    await withRetry(() => apiDeleteMilestone(id), 'deleteMilestone').catch(err => {
+      if (err?.status !== 404) console.warn('[sync] deleteMilestone failed:', err)
+    })
+  }
 }
 
-// Clear all milestones and replace with the supplied array (preserves original IDs).
-// Also wipes all media blobs — they are never included in JSON backups, so any
-// media_type / has_photo flags on restored items are reset to stay consistent.
 export async function restoreMilestones(items) {
   const existing = await dbGetAll()
-  for (const m of existing) await dbDelete(m.id)
-  await dbClearAllMedia()
+  const newIds = new Set(items.map(m => m.id))
+  // Only delete media for milestones that no longer exist on server
+  for (const m of existing) {
+    if (!newIds.has(m.id)) {
+      await dbDeletePhoto(m.id)
+      try { await dbDeleteMedia(m.id) } catch {}
+      // Delete media entries (audio/video) —keys are `${milestoneId}-audio` or `${milestoneId}-video`
+      try { await dbDeleteMedia(`${m.id}-audio`) } catch {}
+      try { await dbDeleteMedia(`${m.id}-video`) } catch {}
+    }
+    await dbDelete(m.id)
+  }
   const clean = items.map(({ photo_uri: _discard, ...m }) => ({
-    mainTimelineVisibility: 'inherit',   // default for backups that predate v4
+    mainTimelineVisibility: 'inherit',
     ...m,
-    media_type: null,
-    has_photo:  false,
+    // Ensure has_photo is a boolean
+    has_photo:  m.has_photo === true || m.has_photo === 1,
+    media_type: m.media_type || null,
   }))
   for (const m of clean) await dbPut(m)
+  if (isApiAvailable()) {
+    withRetry(() => apiRestoreMilestones(clean), 'restoreMilestones').catch(err =>
+      console.warn('[sync] restoreMilestones failed:', err)
+    )
+  }
   return clean
+}
+
+// Merge milestones from server into local (add/update, never delete)
+// Unlike restoreMilestones, this preserves existing local data that isn't in the incoming set.
+export async function mergeMilestones(items) {
+  const localItems = await dbGetAll()
+  const localById = new Map(localItems.map(m => [m.id, m]))
+
+  for (const m of items) {
+    const local = localById.get(m.id)
+    const localPhoto = local?.has_photo ? await dbGetPhoto(m.id) : null
+    const localTime = local?.updated_at ? Date.parse(local.updated_at) : 0
+    const serverTime = m.updated_at ? Date.parse(m.updated_at) : 0
+
+    if (local && localTime > serverTime) {
+      await dbPut({
+        ...local,
+        has_photo: !!(local.has_photo || localPhoto),
+        media_type: local.media_type || null,
+      })
+      continue
+    }
+
+    const clean = {
+      mainTimelineVisibility: 'inherit',
+      ...m,
+      has_photo:  m.has_photo === true || m.has_photo === 1 || !!localPhoto,
+      media_type: m.media_type || null,
+    }
+    await dbPut(clean)
+  }
+}
+
+// Upload media to server after storing locally
+export async function uploadMediaToServer(milestoneId, kind, blob) {
+  if (!isApiAvailable()) return false;
+  try {
+    const file = new File([blob], `${milestoneId}-${kind}`, { type: blob.type });
+    await withRetry(() => apiUploadMedia(milestoneId, kind, file), 'uploadMedia', 5);
+    return true;
+  } catch (err) {
+    console.warn('[sync] uploadMedia failed:', err);
+    return false;
+  }
 }

@@ -1,9 +1,10 @@
 import { dbGetAllChapters, dbGetChapter, dbAddChapter, dbPutChapter, dbDeleteChapter } from './db'
 import { uid } from './milestones'
-
-// Valid color values are the same hex strings used for milestone categories and
-// the settings palette (COLOR_PALETTE in SettingsModal).  No runtime validation
-// here — the caller is responsible for passing a valid palette color.
+import {
+  apiGetChapters, apiGetChapter, apiCreateChapter, apiUpdateChapter, apiDeleteChapter,
+  apiRestoreChapters,
+} from '../lib/api'
+import { isApiAvailable, withRetry } from '../lib/sync'
 
 export function buildChapter({
   title,
@@ -33,6 +34,11 @@ export function buildChapter({
 export async function createChapter(data) {
   const chapter = buildChapter(data)
   await dbAddChapter(chapter)
+  if (isApiAvailable()) {
+    withRetry(() => apiCreateChapter(chapter), 'createChapter').catch(err =>
+      console.warn('[sync] createChapter failed (queued):', err)
+    )
+  }
   return chapter
 }
 
@@ -51,12 +57,26 @@ export async function updateChapter(id, updates, existing) {
     id,
     updated_at: new Date().toISOString(),
   }
+  // Ensure milestoneIds is a proper array (from string if localStorage restored)
+  if (typeof chapter.milestoneIds === 'string') {
+    chapter.milestoneIds = JSON.parse(chapter.milestoneIds);
+  }
   await dbPutChapter(chapter)
+  if (isApiAvailable()) {
+    withRetry(() => apiUpdateChapter(id, chapter), 'updateChapter').catch(err =>
+      console.warn('[sync] updateChapter failed (queued):', err)
+    )
+  }
   return chapter
 }
 
 export async function deleteChapter(id) {
   await dbDeleteChapter(id)
+  if (isApiAvailable()) {
+    await withRetry(() => apiDeleteChapter(id), 'deleteChapter').catch(err => {
+      if (err?.status !== 404) console.warn('[sync] deleteChapter failed:', err)
+    })
+  }
 }
 
 // Adds milestoneId to chapter.milestoneIds; no-op if already present.
@@ -70,6 +90,11 @@ export async function addMilestoneToChapter(chapterId, milestoneId) {
     updated_at:   new Date().toISOString(),
   }
   await dbPutChapter(updated)
+  if (isApiAvailable()) {
+    withRetry(() => apiUpdateChapter(chapterId, updated), 'addMilestoneToChapter').catch(err =>
+      console.warn('[sync] addMilestoneToChapter failed:', err)
+    )
+  }
   return updated
 }
 
@@ -83,6 +108,11 @@ export async function removeMilestoneFromChapter(chapterId, milestoneId) {
     updated_at:   new Date().toISOString(),
   }
   await dbPutChapter(updated)
+  if (isApiAvailable()) {
+    withRetry(() => apiUpdateChapter(chapterId, updated), 'removeMilestoneFromChapter').catch(err =>
+      console.warn('[sync] removeMilestoneFromChapter failed:', err)
+    )
+  }
   return updated
 }
 
@@ -99,10 +129,30 @@ export async function getChaptersForMilestone(milestoneId) {
   return chapters.filter(chapter => chapter.milestoneIds.includes(milestoneId))
 }
 
-// Replaces all chapter records with the supplied array (used by backup restore).
+// Merge chapters from server into local (add/update, never delete)
+export async function mergeChapters(items) {
+  for (const chapter of items) {
+    const c = typeof chapter.milestoneIds === 'string'
+      ? { ...chapter, milestoneIds: JSON.parse(chapter.milestoneIds) }
+      : chapter
+    await dbPutChapter(c)
+  }
+}
+
+// Replaces all chapter records (used by backup restore).
 export async function restoreChapters(items) {
   const existing = await dbGetAllChapters()
   for (const chapter of existing) await dbDeleteChapter(chapter.id)
-  for (const chapter of items)    await dbPutChapter(chapter)
+  for (const chapter of items) {
+    if (typeof chapter.milestoneIds === 'string') {
+      chapter.milestoneIds = JSON.parse(chapter.milestoneIds);
+    }
+    await dbPutChapter(chapter)
+  }
+  if (isApiAvailable()) {
+    withRetry(() => apiRestoreChapters(items), 'restoreChapters').catch(err =>
+      console.warn('[sync] restoreChapters failed:', err)
+    )
+  }
   return items
 }

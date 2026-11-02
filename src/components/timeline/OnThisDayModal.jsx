@@ -9,7 +9,7 @@ export default function OnThisDayModal({ items, onClose, onSelect }) {
     <div className="sheet-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
         <div className="sheet-header">
-          <span className="sheet-title">on this day</span>
+          <span className="sheet-title">历史上的今天</span>
           <button className="sheet-close" onClick={onClose}>✕</button>
         </div>
 
@@ -25,11 +25,11 @@ export default function OnThisDayModal({ items, onClose, onSelect }) {
                     {formatDateDisplay(m.date, m.date_precision)}
                     {yearsAgo > 0 && (
                       <span className="otd-years">
-                        {' '}· {yearsAgo} year{yearsAgo !== 1 ? 's' : ''} ago
+                        {' '}· {yearsAgo}年前
                       </span>
                     )}
                     {m.date_precision === 'month' && (
-                      <span className="otd-approx"> (approx.)</span>
+                      <span className="otd-approx">（约）</span>
                     )}
                   </div>
                 </div>

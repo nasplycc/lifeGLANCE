@@ -29,28 +29,27 @@ export default function IcsImportModal({ candidates, timedCount, categories, onI
       <div className="sheet ics-sheet">
 
         <div className="sheet-header">
-          <span className="sheet-title">import from calendar</span>
+          <span className="sheet-title">从日历导入</span>
           <button className="sheet-close" onClick={onClose}>✕</button>
         </div>
 
         <p className="ics-notice">
-          Import is designed for life milestones — birthdays, graduations, trips.
-          Uncheck anything that doesn't belong.
+          导入功能专为人生里程碑设计——生日、毕业、旅行。取消勾选不相关的条目。
         </p>
 
         <div className="ics-stats">
           <span>
-            {candidates.length} all-day event{candidates.length !== 1 ? 's' : ''} found
+            {candidates.length} 个全天事件
           </span>
           {timedCount > 0 && (
             <span className="ics-stats-skipped">
-              · {timedCount} timed event{timedCount !== 1 ? 's' : ''} skipped
+              · {timedCount} 个有时事件已跳过
             </span>
           )}
         </div>
 
         {candidates.length === 0 ? (
-          <p className="ics-empty">No all-day events were found in this file.</p>
+          <p className="ics-empty">文件中未找到全天事件。</p>
         ) : (
           <div className="ics-table-wrap">
             <table className="ics-table">
@@ -60,9 +59,9 @@ export default function IcsImportModal({ candidates, timedCount, categories, onI
                     <input type="checkbox" checked={allSelected} onChange={toggleAll}
                       title={allSelected ? 'deselect all' : 'select all'} />
                   </th>
-                  <th>date</th>
-                  <th>title</th>
-                  <th>category</th>
+                  <th>日期</th>
+                  <th>标题</th>
+                  <th>分类</th>
                 </tr>
               </thead>
               <tbody>
@@ -73,11 +72,11 @@ export default function IcsImportModal({ candidates, timedCount, categories, onI
                         onChange={() => toggleRow(row.key)} />
                     </td>
                     <td className="ics-col-date">
-                      {row.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {row.date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </td>
                     <td className="ics-col-title">
                       <span>{row.title}</span>
-                      {row.isRecurring && <span className="ics-annual-badge">annual</span>}
+                      {row.isRecurring && <span className="ics-annual-badge">每年</span>}
                     </td>
                     <td className="ics-col-cat">
                       <select
@@ -98,13 +97,13 @@ export default function IcsImportModal({ candidates, timedCount, categories, onI
         )}
 
         <div className="ics-actions">
-          <button className="btn" onClick={onClose}>cancel</button>
+          <button className="btn" onClick={onClose}>取消</button>
           <button
             className="btn btn-filled"
             disabled={selectedCount === 0}
             onClick={handleImport}
           >
-            import {selectedCount} milestone{selectedCount !== 1 ? 's' : ''}
+            导入 {selectedCount} 个里程碑
           </button>
         </div>
 

@@ -16,28 +16,25 @@ export default function AnimatedRelLabel({ dateStr }) {
   const { years, months, days, past } = getYearsMonths(dateStr)
 
   if (years > 0 && months > 0) {
-    const ys = years !== 1 ? 's' : ''
     return past
-      ? <><AnimatedNumber value={years} /> yr{ys}, <AnimatedNumber value={months} /> mo ago</>
-      : <>in <AnimatedNumber value={years} /> yr{ys}, <AnimatedNumber value={months} /> mo</>
+      ? <><AnimatedNumber value={years} />年<AnimatedNumber value={months} />个月前</>
+      : <>还有<AnimatedNumber value={years} />年<AnimatedNumber value={months} />个月</>
   }
   if (years > 0) {
-    const ys = years !== 1 ? 's' : ''
     return past
-      ? <><AnimatedNumber value={years} /> yr{ys} ago</>
-      : <>in <AnimatedNumber value={years} /> yr{ys}</>
+      ? <><AnimatedNumber value={years} />年前</>
+      : <>还有<AnimatedNumber value={years} />年</>
   }
   if (days > 30) {
     const mo = Math.floor(days / 30)
     return past
-      ? <><AnimatedNumber value={mo} /> mo ago</>
-      : <>in <AnimatedNumber value={mo} /> mo</>
+      ? <><AnimatedNumber value={mo} />个月前</>
+      : <>还有<AnimatedNumber value={mo} />个月</>
   }
   if (days > 0) {
-    const ds = days !== 1 ? 's' : ''
     return past
-      ? <><AnimatedNumber value={days} /> day{ds} ago</>
-      : <>in <AnimatedNumber value={days} /> day{ds}</>
+      ? <><AnimatedNumber value={days} />天前</>
+      : <>还有<AnimatedNumber value={days} />天</>
   }
-  return <>today</>
+  return <>今天</>
 }

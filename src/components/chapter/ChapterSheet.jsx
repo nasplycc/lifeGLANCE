@@ -2,17 +2,17 @@ import React, { useState, useMemo, useEffect } from 'react'
 import { buildDateFromParts } from '../../utils/dates'
 
 const CHAPTER_COLORS = [
-  { hex: '#C8A96E', label: 'amber'  },
-  { hex: '#3D3580', label: 'indigo' },
-  { hex: '#E8748A', label: 'coral'  },
-  { hex: '#9370DB', label: 'purple' },
+  { hex: '#C8A96E', label: '琥珀'  },
+  { hex: '#3D3580', label: '靛蓝' },
+  { hex: '#E8748A', label: '珊瑚'  },
+  { hex: '#9370DB', label: '紫色' },
 ]
 
 const MONTHS = [
-  { v: '1',  l: 'Jan' }, { v: '2',  l: 'Feb' }, { v: '3',  l: 'Mar' },
-  { v: '4',  l: 'Apr' }, { v: '5',  l: 'May' }, { v: '6',  l: 'Jun' },
-  { v: '7',  l: 'Jul' }, { v: '8',  l: 'Aug' }, { v: '9',  l: 'Sep' },
-  { v: '10', l: 'Oct' }, { v: '11', l: 'Nov' }, { v: '12', l: 'Dec' },
+  { v: '1',  l: '1月' }, { v: '2',  l: '2月' }, { v: '3',  l: '3月' },
+  { v: '4',  l: '4月' }, { v: '5',  l: '5月' }, { v: '6',  l: '6月' },
+  { v: '7',  l: '7月' }, { v: '8',  l: '8月' }, { v: '9',  l: '9月' },
+  { v: '10', l: '10月' }, { v: '11', l: '11月' }, { v: '12', l: '12月' },
 ]
 
 function fmtDate(m) {
@@ -20,8 +20,8 @@ function fmtDate(m) {
   if (m.date_precision === 'year')
     return String(d.getUTCFullYear())
   if (m.date_precision === 'month')
-    return d.toLocaleString('default', { month: 'short', year: 'numeric', timeZone: 'UTC' })
-  return d.toLocaleString('default', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+    return d.toLocaleString('zh-CN', { month: 'short', year: 'numeric', timeZone: 'UTC' })
+  return d.toLocaleString('zh-CN', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 }
 
 // Parse a stored ISO string into display parts (UTC to avoid timezone shift).
@@ -176,17 +176,17 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
 
         {/* Header */}
         <div className="sheet-header">
-          <span className="sheet-title">{isEdit ? 'edit chapter' : 'add chapter'}</span>
+          <span className="sheet-title">{isEdit ? '编辑章节' : '添加章节'}</span>
           <button type="button" className="sheet-close" onClick={onClose}>✕</button>
         </div>
 
         {/* Title */}
         <div className="sheet-field">
-          <label className="field-label">chapter name</label>
+          <label className="field-label">章节名称</label>
           <input
             className="input"
             type="text"
-            placeholder="e.g. College years"
+            placeholder="例如：大学时光"
             value={title}
             onChange={e => setTitle(e.target.value)}
             autoFocus
@@ -197,14 +197,14 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
 
         {/* Date range */}
         <div className="sheet-field">
-          <label className="field-label">date range</label>
+          <label className="field-label">日期范围</label>
 
           {/* Start date */}
-          <label className="field-label" style={{ marginTop: '0.5rem' }}>from</label>
+          <label className="field-label" style={{ marginTop: '0.5rem' }}>从</label>
           <div className="date-grid">
             {startPrecision !== 'year' && (
               <div>
-                <label className="field-label">month</label>
+                <label className="field-label">月份</label>
                 <select
                   className="input input-sm"
                   value={startMonth}
@@ -217,7 +217,7 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
             )}
             {startPrecision === 'day' && (
               <div>
-                <label className="field-label">day</label>
+                <label className="field-label">日</label>
                 <input
                   className="input input-sm"
                   type="number"
@@ -229,7 +229,7 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
               </div>
             )}
             <div>
-              <label className="field-label">year</label>
+              <label className="field-label">年份</label>
               <input
                 className="input input-sm"
                 type="number"
@@ -241,17 +241,20 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
             </div>
           </div>
           <div className="precision-tabs">
-            {['day', 'month', 'year'].map(p => (
-              <button key={p} type="button"
-                className={`precision-tab ${startPrecision === p ? 'active' : ''}`}
-                onClick={() => setStartPrecision(p)}
-              >{p}</button>
-            ))}
+            {['日', '月', '年'].map((label, idx) => {
+              const p = ['day', 'month', 'year'][idx]
+              return (
+                <button key={p} type="button"
+                  className={`precision-tab ${startPrecision === p ? 'active' : ''}`}
+                  onClick={() => setStartPrecision(p)}
+                >{label}</button>
+              )
+            })}
           </div>
 
           {/* Ongoing toggle */}
           <label className="settings-toggle-row" style={{ marginTop: '0.75rem' }}>
-            <span className="field-label" style={{ marginBottom: 0 }}>ongoing (no end date)</span>
+            <span className="field-label" style={{ marginBottom: 0 }}>进行中（无结束日期）</span>
             <input
               type="checkbox"
               className="settings-toggle"
@@ -265,7 +268,7 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
               <div className="date-grid">
                 {endPrecision !== 'year' && (
                   <div>
-                    <label className="field-label">month</label>
+                    <label className="field-label">月份</label>
                     <select
                       className="input input-sm"
                       value={endMonth}
@@ -278,7 +281,7 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
                 )}
                 {endPrecision === 'day' && (
                   <div>
-                    <label className="field-label">day</label>
+                    <label className="field-label">日</label>
                     <input
                       className="input input-sm"
                       type="number"
@@ -290,7 +293,7 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
                   </div>
                 )}
                 <div>
-                  <label className="field-label">year</label>
+                  <label className="field-label">年份</label>
                   <input
                     className="input input-sm"
                     type="number"
@@ -302,12 +305,15 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
                 </div>
               </div>
               <div className="precision-tabs">
-                {['day', 'month', 'year'].map(p => (
-                  <button key={p} type="button"
-                    className={`precision-tab ${endPrecision === p ? 'active' : ''}`}
-                    onClick={() => setEndPrecision(p)}
-                  >{p}</button>
-                ))}
+                {['日', '月', '年'].map((label, idx) => {
+                  const p = ['day', 'month', 'year'][idx]
+                  return (
+                    <button key={p} type="button"
+                      className={`precision-tab ${endPrecision === p ? 'active' : ''}`}
+                      onClick={() => setEndPrecision(p)}
+                    >{label}</button>
+                  )
+                })}
               </div>
             </>
           )}
@@ -317,7 +323,7 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
 
         {/* Color */}
         <div className="sheet-field">
-          <label className="field-label">color</label>
+          <label className="field-label">颜色</label>
           <div className="chapter-color-row">
             {CHAPTER_COLORS.map(c => (
               <button
@@ -334,11 +340,11 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
 
         {/* Description */}
         <div className="sheet-field">
-          <label className="field-label">description (optional)</label>
+          <label className="field-label">描述（可选）</label>
           <textarea
             className="input"
             rows={2}
-            placeholder="A short description of this chapter…"
+            placeholder="章节的简短描述…"
             value={desc}
             onChange={e => setDesc(e.target.value)}
             maxLength={300}
@@ -350,7 +356,7 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
         <div className="sheet-field">
           <label className="settings-toggle-row">
             <span className="field-label" style={{ marginBottom: 0 }}>
-              hide members from main timeline by default
+              默认从主时间线隐藏成员
             </span>
             <input
               type="checkbox"
@@ -364,15 +370,15 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
         {/* Member milestones */}
         <div className="sheet-field">
           <label className="field-label">
-            milestones in this chapter
+            此章节中的里程碑
             {displayMilestones.length > 0 && (
-              <span className="chapter-member-count"> — {[...checkedIds].filter(id => displayMilestones.some(m => m.id === id)).length} selected</span>
+              <span className="chapter-member-count"> — {[...checkedIds].filter(id => displayMilestones.some(m => m.id === id)).length} 已选</span>
             )}
           </label>
           {!startIso || (!ongoing && !endIso) ? (
-            <div className="chapter-members-empty">set a date range above to see milestones</div>
+            <div className="chapter-members-empty">请先设置日期范围</div>
           ) : displayMilestones.length === 0 ? (
-            <div className="chapter-members-empty">no milestones in this date range</div>
+            <div className="chapter-members-empty">此日期范围内暂无里程碑</div>
           ) : (
             <div className="chapter-members-list">
               {displayMilestones.map(m => {
@@ -403,8 +409,8 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
                       <span
                         className={`chapter-member-endpoint${isEndpoint ? '' : ' chapter-member-endpoint-dim'}`}
                         title={isEndpoint
-                          ? 'endpoint — always shown on main timeline'
-                          : 'matches chapter boundary — add to make it an endpoint'}
+                          ? '端点 — 主时间线始终显示'
+                          : '匹配章节边界 — 勾选成为端点'}
                       >⚓</span>
                     )}
                     <span className="chapter-member-date">{fmtDate(m)}</span>
@@ -420,13 +426,12 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
           confirmDelete ? (
             <div className="detail-confirm">
               <div className="detail-confirm-msg">
-                delete <strong style={{ color: 'var(--text)' }}>{existing.title}</strong>?
-                milestones in this chapter will not be deleted — they will simply no longer
-                be part of this chapter.
+                删除 <strong style={{ color: 'var(--text)' }}>{existing.title}</strong>?
+                此章节中的里程碑不会被删除，它们只是不再属于这个章节。
               </div>
               <div className="detail-confirm-actions">
                 <button type="button" className="btn" onClick={() => setConfirmDelete(false)}>
-                  cancel
+                  取消
                 </button>
                 <button
                   type="button"
@@ -434,7 +439,7 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
                   onClick={handleDelete}
                   disabled={busy}
                 >
-                  {busy ? 'deleting…' : 'yes, delete chapter'}
+                  {busy ? '删除中…' : '确认删除'}
                 </button>
               </div>
             </div>
@@ -446,7 +451,7 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
                 style={{ alignSelf: 'flex-start', fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
                 onClick={() => setConfirmDelete(true)}
               >
-                delete chapter
+                删除章节
               </button>
             </div>
           )
@@ -462,7 +467,7 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
               onClick={onClose}
               style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem' }}
             >
-              cancel
+              取消
             </button>
             <button
               type="submit"
@@ -470,7 +475,7 @@ export default function ChapterSheet({ onSave, onClose, onDelete, existing, mile
               disabled={!canSave || busy}
               style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem' }}
             >
-              {busy ? 'saving…' : isEdit ? 'save changes' : 'add chapter'}
+              {busy ? '保存中…' : isEdit ? '保存修改' : '添加章节'}
             </button>
           </div>
         </div>

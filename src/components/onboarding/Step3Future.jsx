@@ -2,11 +2,11 @@ import React, { useState } from 'react'
 import TypewriterText from '../ui/TypewriterText'
 import { buildDateFromParts } from '../../utils/dates'
 
-const PROMPT = "What's the one thing you're most looking forward to in the future?"
+const PROMPT = "未来你最期待的一件事是什么？"
 
 const MONTHS = [
-  'January','February','March','April','May','June',
-  'July','August','September','October','November','December',
+  '1月','2月','3月','4月','5月','6月',
+  '7月','8月','9月','10月','11月','12月',
 ]
 
 export default function Step3Future({ onSubmit, onSkip, pastMilestone }) {
@@ -27,7 +27,7 @@ export default function Step3Future({ onSubmit, onSkip, pastMilestone }) {
 
     const date = buildDateFromParts(month, year, 'month')
     if (date <= new Date()) {
-      setError('This should be a future event.')
+      setError('请填写未来的事件。')
       return
     }
 
@@ -49,7 +49,7 @@ export default function Step3Future({ onSubmit, onSkip, pastMilestone }) {
           <div className="progress-dot" />
         </div>
         <div className="onboarding-eyebrow" style={{ marginTop: '0.5rem' }}>
-          step 3 of 4 — your future
+          第 3 步，共 4 步 — 你的未来
         </div>
       </div>
 
@@ -74,11 +74,11 @@ export default function Step3Future({ onSubmit, onSkip, pastMilestone }) {
         }}
       >
         <div>
-          <label className="field-label">event name</label>
+          <label className="field-label">事件名称</label>
           <input
             className="input"
             type="text"
-            placeholder="e.g. Trip to Japan"
+            placeholder="例如：去日本旅行"
             value={title}
             onChange={e => setTitle(e.target.value)}
             autoComplete="off"
@@ -88,7 +88,7 @@ export default function Step3Future({ onSubmit, onSkip, pastMilestone }) {
 
         <div className="field-row">
           <div style={{ flex: 2 }}>
-            <label className="field-label">month</label>
+            <label className="field-label">月份</label>
             <select
               className="input"
               value={month}
@@ -101,7 +101,7 @@ export default function Step3Future({ onSubmit, onSkip, pastMilestone }) {
             </select>
           </div>
           <div style={{ flex: 1 }}>
-            <label className="field-label">year</label>
+            <label className="field-label">年份</label>
             <input
               className="input"
               type="number"
@@ -113,7 +113,7 @@ export default function Step3Future({ onSubmit, onSkip, pastMilestone }) {
           </div>
         </div>
 
-        <div className="onboarding-helper">approximate is fine</div>
+        <div className="onboarding-helper">大概日期即可</div>
 
         {error && (
           <div style={{ fontSize: '0.78rem', color: '#E85D75' }}>{error}</div>
@@ -121,12 +121,12 @@ export default function Step3Future({ onSubmit, onSkip, pastMilestone }) {
 
         <div className="onboarding-actions">
           <button type="submit" className="btn" disabled={!canSubmit || busy}>
-            {busy ? 'placing…' : 'place it on my timeline →'}
+            {busy ? '正在放置…' : '放到时间线上 →'}
           </button>
         </div>
       </form>
 
-      <button className="skip-link" onClick={onSkip}>skip</button>
+      <button className="skip-link" onClick={onSkip}>跳过</button>
     </div>
   )
 }

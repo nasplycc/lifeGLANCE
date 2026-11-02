@@ -1,5 +1,5 @@
 /**
- * Minimal Web Audio synthesis for lifeGLANCE.
+ * Minimal Web Audio synthesis for 时光墙.
  * AudioContext is created lazily on the first user gesture (call init()).
  * All play functions are no-ops when muted or before init().
  */
@@ -130,94 +130,10 @@ export function playNavTick(goingForward = false) {
 }
 
 // ── Onboarding ambient ────────────────────────────────────────────────────────
-// Drone: A2 (110 Hz) + detuned copy + E3 fifth, each with a slow LFO tremolo.
-// Melody: random pentatonic piano notes every 1.5–5 s, starting 2.2 s in.
+// Disabled: ambient music removed, only operation sounds remain
 
-// A minor pentatonic, 4th–5th octave
-const PENTATONIC = [
-  261.63,  // C4
-  293.66,  // D4
-  329.63,  // E4
-  392.00,  // G4
-  440.00,  // A4
-  523.25,  // C5
-  587.33,  // D5
-  659.25,  // E5
-  783.99,  // G5
-  880.00,  // A5
-]
-
-function scheduleMelody() {
-  if (!ambientActive || _muted) return
-  const freq = PENTATONIC[Math.floor(Math.random() * PENTATONIC.length)]
-  const vel  = 0.035 + Math.random() * 0.025   // dynamic variation
-  playPianoNote(freq, vel, 1.6)
-  melodyTimer = setTimeout(scheduleMelody, 1500 + Math.random() * 3500)
-}
-
-export function startAmbient() {
-  if (_muted || ambientActive) return
-  const c = getCtx()
-  if (!c) return
-  ambientActive = true
-
-  const voices = [
-    { freq: 110.0,  peakGain: 0.035, lfoFreq: 0.17 },
-    { freq: 110.4,  peakGain: 0.025, lfoFreq: 0.23 },
-    { freq: 164.81, peakGain: 0.018, lfoFreq: 0.13 },
-  ]
-
-  voices.forEach(({ freq, peakGain, lfoFreq }) => {
-    const osc    = c.createOscillator()
-    const gainNd = c.createGain()
-    const lfo    = c.createOscillator()
-    const lfoGn  = c.createGain()
-
-    osc.type = 'sine'
-    osc.frequency.value = freq
-    lfo.type = 'sine'
-    lfo.frequency.value = lfoFreq
-    lfoGn.gain.value = peakGain * 0.3   // LFO depth = 30 % of base gain
-
-    lfo.connect(lfoGn)
-    lfoGn.connect(gainNd.gain)
-    osc.connect(gainNd)
-    gainNd.connect(c.destination)
-
-    gainNd.gain.setValueAtTime(0, c.currentTime)
-    gainNd.gain.linearRampToValueAtTime(peakGain, c.currentTime + 2.5)
-
-    osc.start()
-    lfo.start()
-
-    ambientNodes.push({ osc, gainNd, lfo })
-  })
-
-  // Start melody once the drone has faded in
-  melodyTimer = setTimeout(scheduleMelody, 2200)
-}
-
-function _fadeOutAmbient() {
-  ambientActive = false
-  clearTimeout(melodyTimer)
-  melodyTimer = null
-
-  const c     = ctx
-  const nodes = ambientNodes
-  ambientNodes = []
-
-  nodes.forEach(({ osc, gainNd, lfo }) => {
-    if (c && c.state !== 'closed') {
-      gainNd.gain.cancelScheduledValues(c.currentTime)
-      gainNd.gain.setValueAtTime(gainNd.gain.value, c.currentTime)
-      gainNd.gain.linearRampToValueAtTime(0, c.currentTime + 1.2)
-    }
-    try { osc.stop(c ? c.currentTime + 1.3 : 0) } catch {}
-    try { lfo.stop(c ? c.currentTime + 1.3 : 0) } catch {}
-  })
-}
-
-export function stopAmbient() { _fadeOutAmbient() }
+export function startAmbient() { /* disabled */ }
+export function stopAmbient() { /* disabled */ }
 
 // ── Chapter drill-in / drill-out ──────────────────────────────────────────────
 // Drill-in: ascending frequency sweep (180 → 520 Hz) + arrival piano note.

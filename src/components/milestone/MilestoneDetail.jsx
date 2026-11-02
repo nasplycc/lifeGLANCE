@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { formatDateDisplay, relativeLabel, ageAtDate } from '../../utils/dates'
 import { dbGetMedia, dbGetPhoto } from '../../data/db'
+import { apiMediaUrl } from '../../lib/api'
+import { isApiAvailable } from '../../lib/sync'
 
 export default function MilestoneDetail({ milestone: m, onClose, onEdit, onDelete, onDeleteSeries, birthday, categories = [] }) {
   const [audioUrl,  setAudioUrl]  = useState(null)
@@ -11,9 +13,12 @@ export default function MilestoneDetail({ milestone: m, onClose, onEdit, onDelet
     if (!m.media_type) return
     let objectUrl
     dbGetMedia(m.id).then(result => {
-      if (!result) return
-      objectUrl = URL.createObjectURL(result.blob)
-      setAudioUrl(objectUrl)
+      if (result) {
+        objectUrl = URL.createObjectURL(result.blob)
+        setAudioUrl(objectUrl)
+      } else if (isApiAvailable()) {
+        setAudioUrl(apiMediaUrl(m.id, m.media_type))
+      }
     })
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [m.id, m.media_type])
@@ -22,9 +27,12 @@ export default function MilestoneDetail({ milestone: m, onClose, onEdit, onDelet
     if (!m.has_photo) return
     let objectUrl
     dbGetPhoto(m.id).then(result => {
-      if (!result) return
-      objectUrl = URL.createObjectURL(result.blob)
-      setPhotoUrl(objectUrl)
+      if (result) {
+        objectUrl = URL.createObjectURL(result.blob)
+        setPhotoUrl(objectUrl)
+      } else if (isApiAvailable()) {
+        setPhotoUrl(apiMediaUrl(m.id, 'photo'))
+      }
     })
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl) }
   }, [m.id, m.has_photo])
@@ -36,7 +44,7 @@ export default function MilestoneDetail({ milestone: m, onClose, onEdit, onDelet
     <div className="sheet-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
         <div className="sheet-header">
-          <span className="sheet-title">milestone</span>
+          <span className="sheet-title">里程碑</span>
           <button className="sheet-close" onClick={onClose}>✕</button>
         </div>
 
@@ -61,7 +69,7 @@ export default function MilestoneDetail({ milestone: m, onClose, onEdit, onDelet
           {(() => {
             const age = birthday ? ageAtDate(birthday, m.date) : null
             return age !== null ? (
-              <div className="detail-age">{age} y.o.</div>
+              <div className="detail-age">{age} 岁</div>
             ) : null
           })()}
         </div>
@@ -74,7 +82,7 @@ export default function MilestoneDetail({ milestone: m, onClose, onEdit, onDelet
 
         {/* Recurrence badge */}
         {m.recurrence === 'annual' && (
-          <div className="detail-recurrence">↻ repeats annually</div>
+          <div className="detail-recurrence">↻ 每年重复</div>
         )}
 
         {/* Media (audio / video) */}
@@ -103,18 +111,18 @@ export default function MilestoneDetail({ milestone: m, onClose, onEdit, onDelet
           <div className="detail-confirm">
             <div className="detail-confirm-msg">
               {confirm === 'series'
-                ? `delete all instances of "${m.title}"?`
-                : `delete "${m.title}"?`}
+                ? `删除「${m.title}」的所有实例？`
+                : `删除「${m.title}」？`}
             </div>
             <div className="detail-confirm-actions">
               <button className="btn" onClick={() => setConfirm(null)}
                 style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem' }}>
-                cancel
+                取消
               </button>
               <button className="btn btn-danger"
                 onClick={confirm === 'series' ? doDeleteSeries : doDelete}
                 style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem' }}>
-                {confirm === 'series' ? 'delete all' : 'delete'}
+                {confirm === 'series' ? '删除全部' : '删除'}
               </button>
             </div>
           </div>
@@ -122,19 +130,19 @@ export default function MilestoneDetail({ milestone: m, onClose, onEdit, onDelet
           <div className="sheet-actions">
             <div className="detail-delete-group">
               <button className="btn-ghost" onClick={() => setConfirm('single')}>
-                delete
+                删除
               </button>
               {m.recurrence_id && onDeleteSeries && (
                 <button className="btn-ghost detail-delete-series"
                   onClick={() => setConfirm('series')}>
-                  delete series
+                  删除系列
                 </button>
               )}
             </div>
             <div className="sheet-actions-right">
               <button className="btn" onClick={() => { onClose(); onEdit(m) }}
                 style={{ fontSize: '0.8rem', padding: '0.45rem 0.9rem' }}>
-                edit
+                编辑
               </button>
             </div>
           </div>
